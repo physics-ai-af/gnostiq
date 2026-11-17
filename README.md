@@ -10,45 +10,45 @@ Use the block for your tool.
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
-pytest                    # everything
-python -m pytest          # everything, explicit interpreter
-pytest tests/test_nwp.py  # one file
+```bash
+pytest                        # everything
+python -m pytest              # everything, explicit interpreter
+pytest tests/test_physics.py  # one file
 ```
 
 ### uv
 
-```
-uv run pytest                    # everything
-uv run pytest tests/test_nwp.py  # one file
+```bash
+uv run pytest                        # everything
+uv run pytest tests/test_physics.py  # one file
 ```
 
 ### Poetry
 
-```
-poetry run pytest                    # everything
-poetry run pytest tests/test_nwp.py  # one file
+```bash
+poetry run pytest                        # everything
+poetry run pytest tests/test_physics.py  # one file
 ```
 
 ### Pipenv
 
-```
-pipenv run pytest                    # everything
-pipenv run pytest tests/test_nwp.py  # one file
+```bash
+pipenv run pytest                        # everything
+pipenv run pytest tests/test_physics.py  # one file
 ```
 
 ### Hatch
 
-```
-hatch run pytest                    # everything
-hatch run pytest tests/test_nwp.py  # one file
+```bash
+hatch run pytest                        # everything
+hatch run pytest tests/test_physics.py  # one file
 ```
 
 ### PDM
 
-```
-pdm run pytest                    # everything
-pdm run pytest tests/test_nwp.py  # one file
+```bash
+pdm run pytest                        # everything
+pdm run pytest tests/test_physics.py  # one file
 ```
 
 No test touches the network. Downloads are replaced with stand-ins, and anything that needs data uses synthetic files written in the real formats.
@@ -64,6 +64,7 @@ No test touches the network. Downloads are replaced with stand-ins, and anything
 | `tests/test_cli.py` | Argument handling, unknown sources, data directories, helpful errors |
 | `tests/test_gate.py` | Runs the script on a good record, a pinned id, a daytime-only station and an empty lookup |
 | `tests/test_nwp.py` | Parsing a real response, chunking, request contents, refused groups, assembly, live fallback |
+| `tests/test_physics.py` | Formulas against known values, the terrain prior, wind sign, rain-day boundaries, fallbacks |
 
 ## Setup
 
@@ -71,7 +72,7 @@ You need Python 3.12 or newer. There are no API keys and no accounts. Each block
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 python -m venv .venv                   # or: virtualenv .venv
 source .venv/bin/activate              # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
@@ -91,7 +92,7 @@ The requirements files list direct dependencies only, so pip still picks version
 
 ### uv
 
-```
+```bash
 uv sync
 uv run pytest
 uv run ruff check . && uv run ruff format --check .
@@ -101,7 +102,7 @@ uv run ruff check . && uv run ruff format --check .
 
 ### Poetry
 
-```
+```bash
 poetry install
 poetry run pytest
 poetry run ruff check . && poetry run ruff format --check .
@@ -111,7 +112,7 @@ Poetry reads the standard `[project]` and `[dependency-groups]` tables, so there
 
 ### Pipenv
 
-```
+```bash
 pipenv install --dev
 pipenv run pytest
 pipenv run ruff check . && pipenv run ruff format --check .
@@ -121,7 +122,7 @@ Pipenv does not read `pyproject.toml`. It reads the `Pipfile`, which carries the
 
 ### Hatch
 
-```
+```bash
 hatch env create
 hatch run pytest
 hatch run ruff check . && hatch run ruff format --check .
@@ -131,7 +132,7 @@ hatch run ruff check . && hatch run ruff format --check .
 
 ### PDM
 
-```
+```bash
 pdm install
 pdm run pytest
 pdm run ruff check . && pdm run ruff format --check .
@@ -196,42 +197,42 @@ Run the ingestion with the block for your tool:
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 gnostiq pull   # download both into data/raw/station/
 gnostiq build  # parse and merge into data/interim/
 ```
 
 ### uv
 
-```
+```bash
 uv run gnostiq pull   # download both into data/raw/station/
 uv run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### Poetry
 
-```
+```bash
 poetry run gnostiq pull   # download both into data/raw/station/
 poetry run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### Pipenv
 
-```
+```bash
 pipenv run gnostiq pull   # download both into data/raw/station/
 pipenv run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### Hatch
 
-```
+```bash
 hatch run gnostiq pull   # download both into data/raw/station/
 hatch run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### PDM
 
-```
+```bash
 pdm run gnostiq pull   # download both into data/raw/station/
 pdm run gnostiq build  # parse and merge into data/interim/
 ```
@@ -265,42 +266,42 @@ Run this before any modelling. It answers one question: is the Jos record good e
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 python scripts/gate.py              # looks the station up by WMO number
 python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### uv
 
-```
+```bash
 uv run python scripts/gate.py              # looks the station up by WMO number
 uv run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### Poetry
 
-```
+```bash
 poetry run python scripts/gate.py              # looks the station up by WMO number
 poetry run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### Pipenv
 
-```
+```bash
 pipenv run python scripts/gate.py              # looks the station up by WMO number
 pipenv run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### Hatch
 
-```
+```bash
 hatch run python scripts/gate.py              # looks the station up by WMO number
 hatch run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### PDM
 
-```
+```bash
 pdm run python scripts/gate.py              # looks the station up by WMO number
 pdm run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
@@ -331,42 +332,42 @@ Past forecasts for the Jos grid cell, from Open-Meteo's Previous Runs API. For e
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 gnostiq pull --only nwp
 gnostiq build
 ```
 
 ### uv
 
-```
+```bash
 uv run gnostiq pull --only nwp
 uv run gnostiq build
 ```
 
 ### Poetry
 
-```
+```bash
 poetry run gnostiq pull --only nwp
 poetry run gnostiq build
 ```
 
 ### Pipenv
 
-```
+```bash
 pipenv run gnostiq pull --only nwp
 pipenv run gnostiq build
 ```
 
 ### Hatch
 
-```
+```bash
 hatch run gnostiq pull --only nwp
 hatch run gnostiq build
 ```
 
 ### PDM
 
-```
+```bash
 pdm run gnostiq pull --only nwp
 pdm run gnostiq build
 ```
@@ -396,3 +397,22 @@ So for the base model the usable inputs are the core set plus shortwave radiatio
 `nwp.live(c)` fetches the newest run from the ordinary forecast API. The live-forecast branch uses it later.
 
 The free Open-Meteo API is for non-commercial use and needs attribution.
+
+## Physics
+
+`src/gnostiq/physics.py` holds the meteorology that both training and the live forecast rely on. It has no I/O. There is nothing to run here; the later branches call it.
+
+- `es`, `rh`: saturation vapour pressure and relative humidity (Bolton 1980).
+- `height`: how high a pressure surface sits, from the hypsometric equation. Fed the model's own surface and sea-level pressure, it recovers the height of the model grid cell: 1182 m for the cell over Jos, which matches what Open-Meteo reports.
+- `lapse`: the lapse rate of the model's 850 to 700 hPa layer, limited to 3 to 9.8 K/km. With no pressure-level data it returns the standard 6.5 K/km.
+- `cos_zenith`: where the sun is.
+- `pw_from_td`: precipitable water estimated from surface dewpoint (Reitan 1963), for when the model's column water vapour is missing.
+- `hourly_features`: adds the terrain-corrected temperature and dewpoint (`t_prior`, `td_prior`, `dep_prior`) and the derived predictors to a table of hourly forecasts.
+- `daily_features`: rolls hourly rows up into rain days.
+
+Two conventions are easy to get wrong and are pinned by tests:
+
+- Open-Meteo's precipitation at time `t` fell in the hour before `t`. A rain day starting at `s` therefore sums the hours in `(s, s + 24h]`. Rain reported at 00:00 belongs to the day that just ended.
+- The north-easterly wind component `ne` is positive when the wind blows from the north-east, which is Harmattan flow off the Sahara.
+
+A day with any missing hour is dropped rather than summed short.
