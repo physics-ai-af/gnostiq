@@ -11,44 +11,44 @@ Use the block for your tool.
 ### Standard Python (`venv` / `virtualenv`)
 
 ```
-pytest                    # everything
-python -m pytest          # everything, explicit interpreter
-pytest tests/test_nwp.py  # one file
+pytest                        # everything
+python -m pytest              # everything, explicit interpreter
+pytest tests/test_physics.py  # one file
 ```
 
 ### uv
 
 ```
-uv run pytest                    # everything
-uv run pytest tests/test_nwp.py  # one file
+uv run pytest                        # everything
+uv run pytest tests/test_physics.py  # one file
 ```
 
 ### Poetry
 
 ```
-poetry run pytest                    # everything
-poetry run pytest tests/test_nwp.py  # one file
+poetry run pytest                        # everything
+poetry run pytest tests/test_physics.py  # one file
 ```
 
 ### Pipenv
 
 ```
-pipenv run pytest                    # everything
-pipenv run pytest tests/test_nwp.py  # one file
+pipenv run pytest                        # everything
+pipenv run pytest tests/test_physics.py  # one file
 ```
 
 ### Hatch
 
 ```
-hatch run pytest                    # everything
-hatch run pytest tests/test_nwp.py  # one file
+hatch run pytest                        # everything
+hatch run pytest tests/test_physics.py  # one file
 ```
 
 ### PDM
 
 ```
-pdm run pytest                    # everything
-pdm run pytest tests/test_nwp.py  # one file
+pdm run pytest                        # everything
+pdm run pytest tests/test_physics.py  # one file
 ```
 
 No test touches the network. Downloads are replaced with stand-ins, and anything that needs data uses synthetic files written in the real formats.
@@ -64,6 +64,7 @@ No test touches the network. Downloads are replaced with stand-ins, and anything
 | `tests/test_cli.py` | Argument handling, unknown sources, data directories, helpful errors |
 | `tests/test_gate.py` | Runs the script on a good record, a pinned id, a daytime-only station and an empty lookup |
 | `tests/test_nwp.py` | Parsing a real response, chunking, request contents, refused groups, assembly, live fallback |
+| `tests/test_physics.py` | Formulas against known values, the terrain prior, wind sign, rain-day boundaries, fallbacks |
 
 ## Setup
 
@@ -396,3 +397,22 @@ So for the base model the usable inputs are the core set plus shortwave radiatio
 `nwp.live(c)` fetches the newest run from the ordinary forecast API. The live-forecast branch uses it later.
 
 The free Open-Meteo API is for non-commercial use and needs attribution.
+
+## Physics
+
+`src/gnostiq/physics.py` holds the meteorology that both training and the live forecast rely on. It has no I/O. There is nothing to run here; the later branches call it.
+
+- `es`, `rh`: saturation vapour pressure and relative humidity (Bolton 1980).
+- `height`: how high a pressure surface sits, from the hypsometric equation. Fed the model's own surface and sea-level pressure, it recovers the height of the model grid cell: 1182 m for the cell over Jos, which matches what Open-Meteo reports.
+- `lapse`: the lapse rate of the model's 850 to 700 hPa layer, limited to 3 to 9.8 K/km. With no pressure-level data it returns the standard 6.5 K/km.
+- `cos_zenith`: where the sun is.
+- `pw_from_td`: precipitable water estimated from surface dewpoint (Reitan 1963), for when the model's column water vapour is missing.
+- `hourly_features`: adds the terrain-corrected temperature and dewpoint (`t_prior`, `td_prior`, `dep_prior`) and the derived predictors to a table of hourly forecasts.
+- `daily_features`: rolls hourly rows up into rain days.
+
+Two conventions are easy to get wrong and are pinned by tests:
+
+- Open-Meteo's precipitation at time `t` fell in the hour before `t`. A rain day starting at `s` therefore sums the hours in `(s, s + 24h]`. Rain reported at 00:00 belongs to the day that just ended.
+- The north-easterly wind component `ne` is positive when the wind blows from the north-east, which is Harmattan flow off the Sahara.
+
+A day with any missing hour is dropped rather than summed short.
