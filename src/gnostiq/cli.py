@@ -51,8 +51,14 @@ def verify(c, a):
     verify.run(c)
 
 
+def cases(c, a):
+    from gnostiq import cases
+
+    cases.run(c)
+
+
 def everything(c, a):
-    for step in (build, baselines, train, verify):
+    for step in (build, baselines, train, verify, cases):
         step(c, a)
 
 
@@ -72,7 +78,8 @@ def main(argv=None):
     add("baselines", baselines, "fit the reference forecasts")
     add("train", train, "fit the correction networks")
     add("verify", verify, "write the scorecard for the test window")
-    add("all", everything, "build, baselines, train, verify")
+    add("cases", cases, "write the heavy-rain case replays")
+    add("all", everything, "build, baselines, train, verify, cases")
 
     a = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")

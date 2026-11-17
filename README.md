@@ -13,42 +13,42 @@ Use the block for your tool.
 ```bash
 pytest                      # everything
 python -m pytest            # everything, explicit interpreter
-pytest tests/test_train.py  # one file
+pytest tests/test_cases.py  # one file
 ```
 
 ### uv
 
 ```bash
 uv run pytest                      # everything
-uv run pytest tests/test_train.py  # one file
+uv run pytest tests/test_cases.py  # one file
 ```
 
 ### Poetry
 
 ```bash
 poetry run pytest                      # everything
-poetry run pytest tests/test_train.py  # one file
+poetry run pytest tests/test_cases.py  # one file
 ```
 
 ### Pipenv
 
 ```bash
 pipenv run pytest                      # everything
-pipenv run pytest tests/test_train.py  # one file
+pipenv run pytest tests/test_cases.py  # one file
 ```
 
 ### Hatch
 
 ```bash
 hatch run pytest                      # everything
-hatch run pytest tests/test_train.py  # one file
+hatch run pytest tests/test_cases.py  # one file
 ```
 
 ### PDM
 
 ```bash
 pdm run pytest                      # everything
-pdm run pytest tests/test_train.py  # one file
+pdm run pytest tests/test_cases.py  # one file
 ```
 
 No test touches the network. Downloads are replaced with stand-ins, and anything that needs data uses synthetic files written in the real formats.
@@ -74,6 +74,7 @@ No test touches the network. Downloads are replaced with stand-ins, and anything
 | `tests/test_verify.py` | Threat score, bootstrap, reliability bins, common cases, a baseline-only scorecard |
 | `tests/test_model.py` | The untrained net returns the prior; constraints hold for random weights; losses; round trip |
 | `tests/test_train.py` | Whole-week validation split, early stopping, bundle contents, constraints, the scored model |
+| `tests/test_cases.py` | Case selection, ordering, completeness, and the saved file |
 
 ## Setup
 
@@ -811,3 +812,49 @@ How it trains:
 Each bundle records `cols`: the forecast inputs that actually had data during training. The live forecast uses that list to blank out anything the model never saw.
 
 On a laptop CPU the default settings take a few minutes.
+
+## Case replays
+
+### Standard Python (`venv` / `virtualenv`)
+
+```bash
+gnostiq cases  # or: gnostiq all
+```
+
+### uv
+
+```bash
+uv run gnostiq cases  # or: gnostiq all
+```
+
+### Poetry
+
+```bash
+poetry run gnostiq cases  # or: gnostiq all
+```
+
+### Pipenv
+
+```bash
+pipenv run gnostiq cases  # or: gnostiq all
+```
+
+### Hatch
+
+```bash
+hatch run gnostiq cases  # or: gnostiq all
+```
+
+### PDM
+
+```bash
+pdm run gnostiq cases  # or: gnostiq all
+```
+
+picks the three wettest days of the test window and shows how the forecast for each one changed as the day approached, from seven days out to one. It writes `data/reports/cases.json` with, for the model, EMOS and the raw forecast at each lead: the chance of a wet day, the chance of a heavy day, and the median and 90th-percentile amount.
+
+Only days the model forecast at every lead are eligible, so each replay is complete.
+
+A scorecard tells you about the average day. These tell you what the system said before the days people remember. They are illustrations, not evidence: three days chosen for being extreme cannot show skill, and the selection favours whichever system happens to look good on them.
+
+`gnostiq all` now runs build, baselines, train, verify, cases.
