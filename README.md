@@ -11,49 +11,44 @@ Use the block for your tool.
 ### Standard Python (`venv` / `virtualenv`)
 
 ```bash
-pytest                      # everything
-python -m pytest            # everything, explicit interpreter
-pytest tests/test_cases.py  # one file
+pytest                    # everything
+python -m pytest          # everything, explicit interpreter
+pytest tests/test_run.py  # one file
 ```
 
 ### uv
 
 ```bash
-uv run pytest                      # everything
-uv run pytest tests/test_cases.py  # one file
-uv run pytest tests/test_train.py  # one file
+uv run pytest                    # everything
+uv run pytest tests/test_run.py  # one file
 ```
 
 ### Poetry
 
 ```bash
-poetry run pytest                      # everything
-poetry run pytest tests/test_cases.py  # one file
-poetry run pytest tests/test_train.py  # one file
+poetry run pytest                    # everything
+poetry run pytest tests/test_run.py  # one file
 ```
 
 ### Pipenv
 
 ```bash
-pipenv run pytest                      # everything
-pipenv run pytest tests/test_cases.py  # one file
-pipenv run pytest tests/test_train.py  # one file
+pipenv run pytest                    # everything
+pipenv run pytest tests/test_run.py  # one file
 ```
 
 ### Hatch
 
 ```bash
-hatch run pytest                      # everything
-hatch run pytest tests/test_cases.py  # one file
-hatch run pytest tests/test_train.py  # one file
+hatch run pytest                    # everything
+hatch run pytest tests/test_run.py  # one file
 ```
 
 ### PDM
 
 ```bash
-pdm run pytest                      # everything
-pdm run pytest tests/test_cases.py  # one file
-pdm run pytest tests/test_train.py  # one file
+pdm run pytest                    # everything
+pdm run pytest tests/test_run.py  # one file
 ```
 
 No test touches the network. Downloads are replaced with stand-ins, and anything that needs data uses synthetic files written in the real formats.
@@ -80,6 +75,7 @@ No test touches the network. Downloads are replaced with stand-ins, and anything
 | `tests/test_model.py` | The untrained net returns the prior; constraints hold for random weights; losses; round trip |
 | `tests/test_train.py` | Whole-week validation split, early stopping, bundle contents, constraints, the scored model |
 | `tests/test_cases.py` | Case selection, ordering, completeness, and the saved file |
+| `tests/test_run.py` | Lead-day rounding, coverage, physical consistency, input masking, atomic write |
 
 ## Setup
 
@@ -863,3 +859,58 @@ Only days the model forecast at every lead are eligible, so each replay is compl
 A scorecard tells you about the average day. These tell you what the system said before the days people remember. They are illustrations, not evidence: three days chosen for being extreme cannot show skill, and the selection favours whichever system happens to look good on them.
 
 `gnostiq all` now runs build, baselines, train, verify, cases.
+
+## Live forecast
+
+### Standard Python (`venv` / `virtualenv`)
+
+```bash
+gnostiq run
+```
+
+### uv
+
+```bash
+uv run gnostiq run
+```
+
+### Poetry
+
+```bash
+poetry run gnostiq run
+```
+
+### Pipenv
+
+```bash
+pipenv run gnostiq run
+```
+
+### Hatch
+
+```bash
+hatch run gnostiq run
+```
+
+### PDM
+
+```bash
+pdm run gnostiq run
+```
+
+fetches the newest model run from Open-Meteo, applies the trained networks and writes `data/reports/forecast.json`. It needs the trained models in `data/models/` and the terrain file `data/processed/static.json`.
+
+The document:
+
+```
+site, init_utc, base_model, model_trained, thresholds
+hourly[]  valid_utc, lead_day, t2m{q10,q50,q90}, td2m{q10,q50,q90}, raw{t2m,td2m}
+daily[]   date, start_utc, lead_day, p_wet, p_heavy, tp24{q50,q90}, raw_tp24
+```
+
+Two decisions worth knowing about:
+
+- **Lead days are rounded up.** The archive's "day 2" forecast was issued somewhere between 48 hours and one model cycle more before the hour it describes. A live step 30 hours ahead is therefore treated as day 2, not day 1. The uncertainty shown errs on the wide side rather than the narrow one.
+- **Inputs the model was not trained on are blanked.** The live API serves pressure levels, CAPE and column water vapour; the training archive does not. Letting them in would shift the terrain correction and the moisture estimate away from what was verified, so `run.py` removes any input missing from the bundle's `cols` list. A test checks that those fields cannot change the forecast.
+
+The file is written to a temporary name and renamed, so the web server never reads half a file.
