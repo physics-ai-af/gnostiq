@@ -51,3 +51,10 @@ def nwp_raw(tmp_path_factory):
     tru, daily = synth.truth(c, SYNTH_END)
     synth.write_nwp(c, tru, daily, np.random.default_rng(2), bare=True)
     return c
+
+
+@pytest.fixture(scope="session")
+def raw(tmp_path_factory):
+    c = cfg.load(write_cfg(tmp_path_factory.mktemp("run"), SMALL))
+    synth.make(c, SYNTH_END, bare=True)
+    return c

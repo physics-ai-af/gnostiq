@@ -10,45 +10,45 @@ Use the block for your tool.
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
-pytest                        # everything
-python -m pytest              # everything, explicit interpreter
-pytest tests/test_physics.py  # one file
+```bash
+pytest                       # everything
+python -m pytest             # everything, explicit interpreter
+pytest tests/test_static.py  # one file
 ```
 
 ### uv
 
-```
-uv run pytest                        # everything
-uv run pytest tests/test_physics.py  # one file
+```bash
+uv run pytest                       # everything
+uv run pytest tests/test_static.py  # one file
 ```
 
 ### Poetry
 
-```
-poetry run pytest                        # everything
-poetry run pytest tests/test_physics.py  # one file
+```bash
+poetry run pytest                       # everything
+poetry run pytest tests/test_static.py  # one file
 ```
 
 ### Pipenv
 
-```
-pipenv run pytest                        # everything
-pipenv run pytest tests/test_physics.py  # one file
+```bash
+pipenv run pytest                       # everything
+pipenv run pytest tests/test_static.py  # one file
 ```
 
 ### Hatch
 
-```
-hatch run pytest                        # everything
-hatch run pytest tests/test_physics.py  # one file
+```bash
+hatch run pytest                       # everything
+hatch run pytest tests/test_static.py  # one file
 ```
 
 ### PDM
 
-```
-pdm run pytest                        # everything
-pdm run pytest tests/test_physics.py  # one file
+```bash
+pdm run pytest                       # everything
+pdm run pytest tests/test_static.py  # one file
 ```
 
 No test touches the network. Downloads are replaced with stand-ins, and anything that needs data uses synthetic files written in the real formats.
@@ -65,6 +65,8 @@ No test touches the network. Downloads are replaced with stand-ins, and anything
 | `tests/test_gate.py` | Runs the script on a good record, a pinned id, a daytime-only station and an empty lookup |
 | `tests/test_nwp.py` | Parsing a real response, chunking, request contents, refused groups, assembly, live fallback |
 | `tests/test_physics.py` | Formulas against known values, the terrain prior, wind sign, rain-day boundaries, fallbacks |
+| `tests/test_precip.py` | File paths, pixel reads, nodata, incremental pulls, preliminary to final, refused days |
+| `tests/test_static.py` | Terrain tile naming, model height from pressure, caching, the fallback order |
 
 ## Setup
 
@@ -72,7 +74,7 @@ You need Python 3.12 or newer. There are no API keys and no accounts. Each block
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 python -m venv .venv                   # or: virtualenv .venv
 source .venv/bin/activate              # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
@@ -92,7 +94,7 @@ The requirements files list direct dependencies only, so pip still picks version
 
 ### uv
 
-```
+```bash
 uv sync
 uv run pytest
 uv run ruff check . && uv run ruff format --check .
@@ -102,7 +104,7 @@ uv run ruff check . && uv run ruff format --check .
 
 ### Poetry
 
-```
+```bash
 poetry install
 poetry run pytest
 poetry run ruff check . && poetry run ruff format --check .
@@ -112,7 +114,7 @@ Poetry reads the standard `[project]` and `[dependency-groups]` tables, so there
 
 ### Pipenv
 
-```
+```bash
 pipenv install --dev
 pipenv run pytest
 pipenv run ruff check . && pipenv run ruff format --check .
@@ -122,7 +124,7 @@ Pipenv does not read `pyproject.toml`. It reads the `Pipfile`, which carries the
 
 ### Hatch
 
-```
+```bash
 hatch env create
 hatch run pytest
 hatch run ruff check . && hatch run ruff format --check .
@@ -132,7 +134,7 @@ hatch run ruff check . && hatch run ruff format --check .
 
 ### PDM
 
-```
+```bash
 pdm install
 pdm run pytest
 pdm run ruff check . && pdm run ruff format --check .
@@ -197,42 +199,42 @@ Run the ingestion with the block for your tool:
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 gnostiq pull   # download both into data/raw/station/
 gnostiq build  # parse and merge into data/interim/
 ```
 
 ### uv
 
-```
+```bash
 uv run gnostiq pull   # download both into data/raw/station/
 uv run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### Poetry
 
-```
+```bash
 poetry run gnostiq pull   # download both into data/raw/station/
 poetry run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### Pipenv
 
-```
+```bash
 pipenv run gnostiq pull   # download both into data/raw/station/
 pipenv run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### Hatch
 
-```
+```bash
 hatch run gnostiq pull   # download both into data/raw/station/
 hatch run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### PDM
 
-```
+```bash
 pdm run gnostiq pull   # download both into data/raw/station/
 pdm run gnostiq build  # parse and merge into data/interim/
 ```
@@ -266,42 +268,42 @@ Run this before any modelling. It answers one question: is the Jos record good e
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 python scripts/gate.py              # looks the station up by WMO number
 python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### uv
 
-```
+```bash
 uv run python scripts/gate.py              # looks the station up by WMO number
 uv run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### Poetry
 
-```
+```bash
 poetry run python scripts/gate.py              # looks the station up by WMO number
 poetry run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### Pipenv
 
-```
+```bash
 pipenv run python scripts/gate.py              # looks the station up by WMO number
 pipenv run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### Hatch
 
-```
+```bash
 hatch run python scripts/gate.py              # looks the station up by WMO number
 hatch run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### PDM
 
-```
+```bash
 pdm run python scripts/gate.py              # looks the station up by WMO number
 pdm run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
@@ -332,42 +334,42 @@ Past forecasts for the Jos grid cell, from Open-Meteo's Previous Runs API. For e
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 gnostiq pull --only nwp
 gnostiq build
 ```
 
 ### uv
 
-```
+```bash
 uv run gnostiq pull --only nwp
 uv run gnostiq build
 ```
 
 ### Poetry
 
-```
+```bash
 poetry run gnostiq pull --only nwp
 poetry run gnostiq build
 ```
 
 ### Pipenv
 
-```
+```bash
 pipenv run gnostiq pull --only nwp
 pipenv run gnostiq build
 ```
 
 ### Hatch
 
-```
+```bash
 hatch run gnostiq pull --only nwp
 hatch run gnostiq build
 ```
 
 ### PDM
 
-```
+```bash
 pdm run gnostiq pull --only nwp
 pdm run gnostiq build
 ```
@@ -416,3 +418,106 @@ Two conventions are easy to get wrong and are pinned by tests:
 - The north-easterly wind component `ne` is positive when the wind blows from the north-east, which is Harmattan flow off the Sahara.
 
 A day with any missing hour is dropped rather than summed short.
+
+## Rain truth and terrain
+
+### CHIRPS
+
+When the station gauge is not usable, daily rain truth comes from CHIRPS v3. The daily files are global GeoTIFFs of 10 to 15 MB each, so downloading them whole is out of the question. Instead `precip.py` opens each one over HTTP and reads only the 3 by 3 block of pixels around the station, about 15 km across. It keeps the centre pixel and the block mean; the block mean is what is used as truth.
+
+#### Standard Python (`venv` / `virtualenv`)
+
+```bash
+gnostiq pull --only precip
+```
+
+#### uv
+
+```bash
+uv run gnostiq pull --only precip
+```
+
+#### Poetry
+
+```bash
+poetry run gnostiq pull --only precip
+```
+
+#### Pipenv
+
+```bash
+pipenv run gnostiq pull --only precip
+```
+
+#### Hatch
+
+```bash
+hatch run gnostiq pull --only precip
+```
+
+#### PDM
+
+```bash
+pdm run gnostiq pull --only precip
+```
+
+The series is kept in `data/raw/chirps/chirps_<flavor>.parquet` with columns `day`, `pt`, `tp24`, `stage`.
+
+- `truth.chirps_flavor = "sat"` takes its day-to-day timing from IMERG satellite estimates, `"rnl"` from ERA5. `sat` is the default because ERA5 is itself an ECMWF product, and scoring an ECMWF forecast against ECMWF-timed rain would flatter it.
+- Recent days come from the preliminary product until the final one is published, around the third week of the following month. Preliminary days are read again on every pull and replaced when the final file appears.
+- The server rate-limits. One test request came back with a 429. A day it refuses is not stored, so the next pull tries it again. Re-run until the log says `0 not read`. The first full pull is about 2,100 small reads and can take 20 to 60 minutes.
+
+On a plain `gnostiq pull`, CHIRPS is skipped when `truth.rain = "station"`. Name it with `--only precip` to fetch it anyway.
+
+File paths were checked against the server's directory listing on 2026-11-17. Final `sat` files existed through October 2026.
+
+CHIRPS daily totals are treated as running 00 to 00 UTC. That is an assumption to check against a few known storm dates.
+
+### Terrain
+
+#### Standard Python (`venv` / `virtualenv`)
+
+```bash
+gnostiq pull --only static
+```
+
+#### uv
+
+```bash
+uv run gnostiq pull --only static
+```
+
+#### Poetry
+
+```bash
+poetry run gnostiq pull --only static
+```
+
+#### Pipenv
+
+```bash
+pipenv run gnostiq pull --only static
+```
+
+#### Hatch
+
+```bash
+hatch run gnostiq pull --only static
+```
+
+#### PDM
+
+```bash
+pdm run gnostiq pull --only static
+```
+
+writes `data/processed/static.json`:
+
+| Key | Meaning |
+|---|---|
+| `z_station` | Station height from the config |
+| `z_model_hyps` | Height of the model grid cell, worked out from the model's own surface and sea-level pressure |
+| `z_model_api` | The elevation Open-Meteo reports for the cell |
+| `z_dem_point`, `z_dem_9km` | Copernicus 30 m terrain at the station, and averaged over about 9 km |
+
+The correction for terrain is driven by station height minus model height. `static.z_model()` prefers the pressure-derived figure, then the API's. If neither is on file it falls back to the station height, which switches the correction off and logs a warning. A failed terrain download does not stop the pull; the DEM figures are for the gate and for your own checking, not for the model.

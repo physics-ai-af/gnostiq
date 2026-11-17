@@ -8,8 +8,9 @@ gnostiq = {path = ".", editable = true}
 numpy = "==2.5.5"
 pandas = "==3.1.1"
 pyarrow = "==26.0.1"
+rasterio = "==1.5.2"
 requests = "==2.34.2"
-tzdata = {version = "==2026.6", markers = "sys_platform == 'win32'"}
+tzdata = "==2026.6"
 
 [dev-packages]
 pytest = "==9.2.0"
