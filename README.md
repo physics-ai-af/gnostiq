@@ -10,7 +10,7 @@ Use the block for your tool.
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 pytest                          # everything
 python -m pytest                # everything, explicit interpreter
 pytest tests/test_baselines.py  # one file
@@ -18,35 +18,35 @@ pytest tests/test_baselines.py  # one file
 
 ### uv
 
-```bash
+```
 uv run pytest                          # everything
 uv run pytest tests/test_baselines.py  # one file
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run pytest                          # everything
 poetry run pytest tests/test_baselines.py  # one file
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run pytest                          # everything
 pipenv run pytest tests/test_baselines.py  # one file
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run pytest                          # everything
 hatch run pytest tests/test_baselines.py  # one file
 ```
 
 ### PDM
 
-```bash
+```
 pdm run pytest                          # everything
 pdm run pytest tests/test_baselines.py  # one file
 ```
@@ -78,7 +78,7 @@ You need Python 3.12 or newer. There are no API keys and no accounts. Each block
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 python -m venv .venv                   # or: virtualenv .venv
 source .venv/bin/activate              # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
@@ -98,7 +98,7 @@ The requirements files list direct dependencies only, so pip still picks version
 
 ### uv
 
-```bash
+```
 uv sync
 uv run pytest
 uv run ruff check . && uv run ruff format --check .
@@ -108,7 +108,7 @@ uv run ruff check . && uv run ruff format --check .
 
 ### Poetry
 
-```bash
+```
 poetry install
 poetry run pytest
 poetry run ruff check . && poetry run ruff format --check .
@@ -118,7 +118,7 @@ Poetry reads the standard `[project]` and `[dependency-groups]` tables, so there
 
 ### Pipenv
 
-```bash
+```
 pipenv install --dev
 pipenv run pytest
 pipenv run ruff check . && pipenv run ruff format --check .
@@ -128,7 +128,7 @@ Pipenv does not read `pyproject.toml`. It reads the `Pipfile`, which carries the
 
 ### Hatch
 
-```bash
+```
 hatch env create
 hatch run pytest
 hatch run ruff check . && hatch run ruff format --check .
@@ -138,7 +138,7 @@ hatch run ruff check . && hatch run ruff format --check .
 
 ### PDM
 
-```bash
+```
 pdm install
 pdm run pytest
 pdm run ruff check . && pdm run ruff format --check .
@@ -203,42 +203,42 @@ Run the ingestion with the block for your tool:
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq pull   # download both into data/raw/station/
 gnostiq build  # parse and merge into data/interim/
 ```
 
 ### uv
 
-```bash
+```
 uv run gnostiq pull   # download both into data/raw/station/
 uv run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run gnostiq pull   # download both into data/raw/station/
 poetry run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run gnostiq pull   # download both into data/raw/station/
 pipenv run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run gnostiq pull   # download both into data/raw/station/
 hatch run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### PDM
 
-```bash
+```
 pdm run gnostiq pull   # download both into data/raw/station/
 pdm run gnostiq build  # parse and merge into data/interim/
 ```
@@ -272,42 +272,42 @@ Run this before any modelling. It answers one question: is the Jos record good e
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 python scripts/gate.py              # looks the station up by WMO number
 python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### uv
 
-```bash
+```
 uv run python scripts/gate.py              # looks the station up by WMO number
 uv run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run python scripts/gate.py              # looks the station up by WMO number
 poetry run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run python scripts/gate.py              # looks the station up by WMO number
 pipenv run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run python scripts/gate.py              # looks the station up by WMO number
 hatch run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### PDM
 
-```bash
+```
 pdm run python scripts/gate.py              # looks the station up by WMO number
 pdm run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
@@ -338,42 +338,42 @@ Past forecasts for the Jos grid cell, from Open-Meteo's Previous Runs API. For e
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq pull --only nwp
 gnostiq build
 ```
 
 ### uv
 
-```bash
+```
 uv run gnostiq pull --only nwp
 uv run gnostiq build
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run gnostiq pull --only nwp
 poetry run gnostiq build
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run gnostiq pull --only nwp
 pipenv run gnostiq build
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run gnostiq pull --only nwp
 hatch run gnostiq build
 ```
 
 ### PDM
 
-```bash
+```
 pdm run gnostiq pull --only nwp
 pdm run gnostiq build
 ```
@@ -431,37 +431,37 @@ When the station gauge is not usable, daily rain truth comes from CHIRPS v3. The
 
 #### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq pull --only precip
 ```
 
 #### uv
 
-```bash
+```
 uv run gnostiq pull --only precip
 ```
 
 #### Poetry
 
-```bash
+```
 poetry run gnostiq pull --only precip
 ```
 
 #### Pipenv
 
-```bash
+```
 pipenv run gnostiq pull --only precip
 ```
 
 #### Hatch
 
-```bash
+```
 hatch run gnostiq pull --only precip
 ```
 
 #### PDM
 
-```bash
+```
 pdm run gnostiq pull --only precip
 ```
 
@@ -481,37 +481,37 @@ CHIRPS daily totals are treated as running 00 to 00 UTC. That is an assumption t
 
 #### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq pull --only static
 ```
 
 #### uv
 
-```bash
+```
 uv run gnostiq pull --only static
 ```
 
 #### Poetry
 
-```bash
+```
 poetry run gnostiq pull --only static
 ```
 
 #### Pipenv
 
-```bash
+```
 pipenv run gnostiq pull --only static
 ```
 
 #### Hatch
 
-```bash
+```
 hatch run gnostiq pull --only static
 ```
 
 #### PDM
 
-```bash
+```
 pdm run gnostiq pull --only static
 ```
 
@@ -532,37 +532,37 @@ Station reports are checked before anything is trained or scored against them. A
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq build
 ```
 
 ### uv
 
-```bash
+```
 uv run gnostiq build
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run gnostiq build
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run gnostiq build
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run gnostiq build
 ```
 
 ### PDM
 
-```bash
+```
 pdm run gnostiq build
 ```
 
@@ -605,37 +605,37 @@ These are the forecasts the model has to beat. They are built before the model e
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq baselines
 ```
 
 ### uv
 
-```bash
+```
 uv run gnostiq baselines
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run gnostiq baselines
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run gnostiq baselines
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run gnostiq baselines
 ```
 
 ### PDM
 
-```bash
+```
 pdm run gnostiq baselines
 ```
 
