@@ -21,6 +21,7 @@ pytest tests/test_cases.py  # one file
 ```bash
 uv run pytest                      # everything
 uv run pytest tests/test_cases.py  # one file
+uv run pytest tests/test_train.py  # one file
 ```
 
 ### Poetry
@@ -28,6 +29,7 @@ uv run pytest tests/test_cases.py  # one file
 ```bash
 poetry run pytest                      # everything
 poetry run pytest tests/test_cases.py  # one file
+poetry run pytest tests/test_train.py  # one file
 ```
 
 ### Pipenv
@@ -35,6 +37,7 @@ poetry run pytest tests/test_cases.py  # one file
 ```bash
 pipenv run pytest                      # everything
 pipenv run pytest tests/test_cases.py  # one file
+pipenv run pytest tests/test_train.py  # one file
 ```
 
 ### Hatch
@@ -42,6 +45,7 @@ pipenv run pytest tests/test_cases.py  # one file
 ```bash
 hatch run pytest                      # everything
 hatch run pytest tests/test_cases.py  # one file
+hatch run pytest tests/test_train.py  # one file
 ```
 
 ### PDM
@@ -49,6 +53,7 @@ hatch run pytest tests/test_cases.py  # one file
 ```bash
 pdm run pytest                      # everything
 pdm run pytest tests/test_cases.py  # one file
+pdm run pytest tests/test_train.py  # one file
 ```
 
 No test touches the network. Downloads are replaced with stand-ins, and anything that needs data uses synthetic files written in the real formats.

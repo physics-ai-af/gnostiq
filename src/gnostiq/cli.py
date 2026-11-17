@@ -59,6 +59,7 @@ def cases(c, a):
 
 def everything(c, a):
     for step in (build, baselines, train, verify, cases):
+    for step in (build, baselines, train, verify):
         step(c, a)
 
 
@@ -80,6 +81,7 @@ def main(argv=None):
     add("verify", verify, "write the scorecard for the test window")
     add("cases", cases, "write the heavy-rain case replays")
     add("all", everything, "build, baselines, train, verify, cases")
+    add("all", everything, "build, baselines, train, verify")
 
     a = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
