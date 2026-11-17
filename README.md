@@ -11,44 +11,44 @@ Use the block for your tool.
 ### Standard Python (`venv` / `virtualenv`)
 
 ```
-pytest                          # everything
-python -m pytest                # everything, explicit interpreter
-pytest tests/test_baselines.py  # one file
+pytest                       # everything
+python -m pytest             # everything, explicit interpreter
+pytest tests/test_verify.py  # one file
 ```
 
 ### uv
 
 ```
-uv run pytest                          # everything
-uv run pytest tests/test_baselines.py  # one file
+uv run pytest                       # everything
+uv run pytest tests/test_verify.py  # one file
 ```
 
 ### Poetry
 
 ```
-poetry run pytest                          # everything
-poetry run pytest tests/test_baselines.py  # one file
+poetry run pytest                       # everything
+poetry run pytest tests/test_verify.py  # one file
 ```
 
 ### Pipenv
 
 ```
-pipenv run pytest                          # everything
-pipenv run pytest tests/test_baselines.py  # one file
+pipenv run pytest                       # everything
+pipenv run pytest tests/test_verify.py  # one file
 ```
 
 ### Hatch
 
 ```
-hatch run pytest                          # everything
-hatch run pytest tests/test_baselines.py  # one file
+hatch run pytest                       # everything
+hatch run pytest tests/test_verify.py  # one file
 ```
 
 ### PDM
 
 ```
-pdm run pytest                          # everything
-pdm run pytest tests/test_baselines.py  # one file
+pdm run pytest                       # everything
+pdm run pytest tests/test_verify.py  # one file
 ```
 
 No test touches the network. Downloads are replaced with stand-ins, and anything that needs data uses synthetic files written in the real formats.
@@ -71,6 +71,7 @@ No test touches the network. Downloads are replaced with stand-ins, and anything
 | `tests/test_align.py` | Split boundaries, the joins, rain-day sums, truth source selection, missing inputs |
 | `tests/test_dist.py` | CRPS against sampling, point forecasts, rain quantiles and exceedance |
 | `tests/test_baselines.py` | Each baseline recovers a known signal; no test-window leakage; persistence timing |
+| `tests/test_verify.py` | Threat score, bootstrap, reliability bins, common cases, a baseline-only scorecard |
 
 ## Setup
 
@@ -658,3 +659,55 @@ Outputs, both under `data/processed/`:
 - `pred_daily_base.parquet`: `day`, `lead_day`, `split`, `obs`, `system`, `p1` and `p10` (chance of at least the wet and heavy thresholds), and 99 quantiles `q01` to `q99`.
 
 `dist.py` has the scoring maths these share with the scorecard: CRPS for a normal distribution, CRPS from quantiles, and the rain distribution, which is a point mass at zero plus a gamma above the wet threshold.
+
+## Scorecard
+
+### Standard Python (`venv` / `virtualenv`)
+
+```
+gnostiq verify  # or: gnostiq all
+```
+
+### uv
+
+```
+uv run gnostiq verify  # or: gnostiq all
+```
+
+### Poetry
+
+```
+poetry run gnostiq verify  # or: gnostiq all
+```
+
+### Pipenv
+
+```
+pipenv run gnostiq verify  # or: gnostiq all
+```
+
+### Hatch
+
+```
+hatch run gnostiq verify  # or: gnostiq all
+```
+
+### PDM
+
+```
+pdm run gnostiq verify  # or: gnostiq all
+```
+
+scores every system on the test window and writes `data/reports/scorecard.md` for reading and `scorecard.json` for the web page.
+
+It runs as soon as the baselines exist. Until the model has been trained the card simply has no `gnostiq` row and no skill section. That is deliberate: you can look at how good the baselines are before you have anything to compare them with.
+
+How it keeps the comparison fair:
+
+- **Same cases for everyone.** A case counts only if every core system produced a forecast for it. The extra models can lack cases (ICON has no day 7); their smaller `n` is shown and they are not directly comparable.
+- **Proper scores.** CRPS for all three variables, Brier score at the wet and heavy thresholds. For a system that gives a single number, CRPS is the absolute error, so point forecasts and probabilistic ones sit in one column.
+- **Honest intervals.** Skill is `1 - score / reference score`. Its 95% interval comes from resampling whole days 1,000 times, because errors within one day are not independent. An interval that includes zero is not evidence of skill, and the report says so at the top.
+
+Also reported: bias, mean absolute error, how often the 80% interval contained the truth, equitable threat score for rain, results by lead day and by month, and reliability tables for the rain probabilities.
+
+Start with the lines `CRPSS vs emos`.

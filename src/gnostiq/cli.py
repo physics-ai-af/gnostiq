@@ -39,6 +39,17 @@ def baselines(c, a):
     baselines.run(c)
 
 
+def verify(c, a):
+    from gnostiq import verify
+
+    verify.run(c)
+
+
+def everything(c, a):
+    for step in (build, baselines, verify):
+        step(c, a)
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="gnostiq")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -53,6 +64,8 @@ def main(argv=None):
     s.add_argument("--refresh", action="store_true", help="re-download files that change over time")
     add("build", build, "parse raw files into the working tables")
     add("baselines", baselines, "fit the reference forecasts")
+    add("verify", verify, "write the scorecard for the test window")
+    add("all", everything, "build, baselines, verify")
 
     a = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
