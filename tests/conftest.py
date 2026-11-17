@@ -67,3 +67,12 @@ def built(raw):
     station.build(raw)
     nwp.build(raw)
     return raw
+
+
+@pytest.fixture(scope="session")
+def pairs(built):
+    from gnostiq import align, qc
+
+    qc.run(built)
+    align.build(built)
+    return built
