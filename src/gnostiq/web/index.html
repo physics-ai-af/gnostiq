@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gnostiq: Jos</title>
+<style>
+:root {
+  color-scheme: light;
+  --surface: #fcfcfb; --card: #ffffff; --rule: #e7e6e2; --text: #0b0b0b; --text2: #52514e; --text3: #7b7a75;
+  --gnostiq: #2a78d6; --raw: #eb6834; --emos: #1baf7a; --band: #cde2fb; --p1: #86b6ef; --p2: #1c5cab;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --surface: #1a1a19; --card: #222220; --rule: #383835; --text: #f0efec; --text2: #c3c2b7; --text3: #8f8e86;
+    --gnostiq: #3987e5; --raw: #d95926; --emos: #199e70; --band: #184f95; --p1: #86b6ef; --p2: #256abf;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--surface); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 880px; margin: 0 auto; padding: 24px 16px 64px; }
+h1 { font-size: 22px; margin: 0; font-weight: 650; }
+h2 { font-size: 16px; margin: 40px 0 4px; font-weight: 650; }
+h3 { font-size: 13px; margin: 0; font-weight: 600; }
+p { margin: 4px 0; color: var(--text2); }
+.sub { color: var(--text3); font-size: 12px; }
+.card { background: var(--card); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 14px 10px; margin-top: 12px; }
+.head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--text2); flex-wrap: wrap; }
+.key { display: inline-block; width: 14px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 5px; }
+.key.box { height: 9px; border: 0; border-radius: 2px; }
+button, select { font: inherit; font-size: 12px; color: var(--text2); background: transparent; border: 1px solid var(--rule); border-radius: 6px; padding: 3px 8px; cursor: pointer; }
+.filters { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+svg text { fill: var(--text3); font-size: 11px; font-variant-numeric: tabular-nums; }
+.grid { stroke: var(--rule); stroke-width: 1; }
+table { border-collapse: collapse; width: 100%; font-size: 12px; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 4px 8px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--text3); font-weight: 500; }
+.scroll { overflow-x: auto; }
+.tview { display: none; margin-top: 8px; max-height: 280px; overflow: auto; }
+.tview.on { display: block; }
+#tip { position: fixed; pointer-events: none; background: var(--card); border: 1px solid var(--rule); border-radius: 6px; padding: 6px 9px; font-size: 12px; box-shadow: 0 2px 10px rgb(0 0 0 / .12); display: none; z-index: 5; min-width: 120px; }
+#tip .t { color: var(--text3); margin-bottom: 3px; }
+#tip .r { display: flex; justify-content: space-between; gap: 14px; color: var(--text2); }
+#tip b { color: var(--text); font-weight: 600; }
+.cases { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.empty { color: var(--text3); padding: 18px 0; }
+footer { margin-top: 48px; color: var(--text3); font-size: 12px; }
+a { color: inherit; }
+</style>
+</head>
+<body>
+<main>
+  <div class="head"><h1>Gnostiq: Jos</h1><span class="sub" id="meta"></span></div>
+  <p>Global model forecasts corrected for the Jos Plateau, with uncertainty, checked against observations the model never saw.</p>
+
+  <h2>Forecast</h2>
+  <div id="forecast"></div>
+
+  <h2>Verification</h2>
+  <p id="vmeta"></p>
+  <div class="filters"><label class="sub" for="var">Variable</label>
+    <select id="var"><option value="t2m">Temperature</option><option value="td2m">Dewpoint</option><option value="tp24">24 h rain</option></select></div>
+  <div id="verify"></div>
+
+  <h2>Heavy-rain cases</h2>
+  <p id="cmeta"></p>
+  <div id="cases"></div>
+
+  <footer>
+    Forecast input: Open-Meteo (CC BY 4.0), ECMWF open data. Observations: NOAA GHCNh, Iowa Environmental Mesonet. Rainfall: CHIRPS v3, Climate Hazards Center.
+    <a href="/method">Method note</a>.
+  </footer>
+</main>
+<div id="tip"></div>
+<script>
+const NS = "http://www.w3.org/2000/svg";
+const NAMES = { gnostiq: "Gnostiq", raw: "Raw model", emos: "EMOS", clim: "Climatology", persist: "Persistence", lapse: "Height-corrected" };
+const ORDER = ["gnostiq", "raw", "emos", "lapse", "persist", "clim"];
+const label = (s) => NAMES[s] || s.replace("raw:", "Raw ");
+const COLOR = { gnostiq: "var(--gnostiq)", raw: "var(--raw)", emos: "var(--emos)" };
+const $ = (s) => document.querySelector(s);
+const tip = $("#tip");
+
+function el(tag, attrs = {}, parent, text) {
+  const svg = ["svg", "g", "path", "line", "rect", "circle", "text", "polygon"].includes(tag);
+  const e = svg ? document.createElementNS(NS, tag) : document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (text != null) e.textContent = text;
+  if (parent) parent.appendChild(e);
+  return e;
+}
+const fx = (v, n = 1) => (v == null || !isFinite(v) ? "-" : v.toFixed(n));
+const sx = (v) => (v == null ? "-" : (v >= 0 ? "+" : "") + v.toFixed(3));
+const lin = (d0, d1, r0, r1) => (v) => r0 + ((v - d0) / (d1 - d0 || 1)) * (r1 - r0);
+
+function ticks(lo, hi, n = 5) {
+  const step0 = (hi - lo) / n || 1, mag = 10 ** Math.floor(Math.log10(step0));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= step0);
+  const out = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(+v.toFixed(10));
+  return out;
+}
+
+function showTip(ev, title, rows) {
+  tip.replaceChildren();
+  el("div", { class: "t" }, tip, title);
+  for (const [name, value, color] of rows) {
+    const r = el("div", { class: "r" }, tip);
+    const l = el("span", {}, r);
+    if (color) el("span", { class: "key", style: `border-color:${color}` }, l);
+    l.append(name);
+    el("b", {}, r, value);
+  }
+  tip.style.display = "block";
+  const w = tip.offsetWidth, x = ev.clientX + 14;
+  tip.style.left = (x + w > innerWidth ? ev.clientX - w - 14 : x) + "px";
+  tip.style.top = ev.clientY + 12 + "px";
+}
+const hideTip = () => (tip.style.display = "none");
+
+function card(parent, title, sub, legend) {
+  const c = el("div", { class: "card" }, parent);
+  const h = el("div", { class: "head" }, c);
+  const left = el("div", {}, h);
+  el("h3", {}, left, title);
+  if (sub) el("div", { class: "sub" }, left, sub);
+  const right = el("div", { class: "legend" }, h);
+  for (const [name, color, box] of legend || []) {
+    const s = el("span", {}, right);
+    el("span", { class: "key" + (box ? " box" : ""), style: box ? `background:${color}` : `border-color:${color}` }, s);
+    s.append(name);
+  }
+  const body = el("div", {}, c);
+  const tv = el("div", { class: "tview scroll" }, c);
+  const btn = el("button", { type: "button" }, right, "Table");
+  btn.onclick = () => tv.classList.toggle("on");
+  return { body, tv };
+}
+
+function table(parent, cols, rows) {
+  const t = el("table", {}, parent);
+  const hr = el("tr", {}, el("thead", {}, t));
+  cols.forEach((c) => el("th", {}, hr, c));
+  const tb = el("tbody", {}, t);
+  rows.forEach((r) => { const tr = el("tr", {}, tb); r.forEach((v) => el("td", {}, tr, v)); });
+}
+
+function lineChart(parent, o) {
+  const W = o.w || 760, H = o.h || 250, m = { t: 12, r: o.right || 16, b: 26, l: 40 };
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": o.label }, parent);
+  const ys = o.series.flatMap((s) => [...s.pts.map((p) => p[1]), ...(s.band || s.whisk || []).flatMap((b) => [b[1], b[2]])]).filter((v) => v != null && isFinite(v));
+  let lo = Math.min(...ys, ...(o.include || [])), hi = Math.max(...ys, ...(o.include || []));
+  const pad = (hi - lo) * 0.08 || 1;
+  lo = o.ymin ?? lo - pad; hi = o.ymax ?? hi + pad;
+  const X = lin(o.x0, o.x1, m.l, W - m.r), Y = lin(lo, hi, H - m.b, m.t);
+  for (const v of ticks(lo, hi)) {
+    el("line", { class: "grid", x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v) }, svg);
+    el("text", { x: m.l - 6, y: Y(v) + 4, "text-anchor": "end" }, svg, o.yfmt ? o.yfmt(v) : v);
+  }
+  for (const [v, lab] of o.xticks) el("text", { x: X(v), y: H - 8, "text-anchor": "middle" }, svg, lab);
+  if (o.zero != null) el("line", { x1: m.l, x2: W - m.r, y1: Y(o.zero), y2: Y(o.zero), stroke: "var(--text3)", "stroke-width": 1 }, svg);
+  if (o.diag) el("line", { x1: X(0), y1: Y(0), x2: X(1), y2: Y(1), stroke: "var(--text3)", "stroke-width": 1 }, svg);
+  for (const s of o.series) {
+    if (s.band) el("polygon", { fill: "var(--band)", opacity: 0.7, points: [...s.band.map((b) => `${X(b[0])},${Y(b[2])}`), ...s.band.slice().reverse().map((b) => `${X(b[0])},${Y(b[1])}`)].join(" ") }, svg);
+  }
+  for (const s of o.series) {
+    for (const w of s.whisk || []) if (w[1] != null) el("line", { x1: X(w[0]), x2: X(w[0]), y1: Y(w[1]), y2: Y(w[2]), stroke: s.color, "stroke-width": 1.5, opacity: 0.55 }, svg);
+    const pts = s.pts.filter((p) => p[1] != null);
+    el("path", { d: pts.map((p, i) => (i ? "L" : "M") + X(p[0]).toFixed(1) + " " + Y(p[1]).toFixed(1)).join(""), fill: "none", stroke: s.color, "stroke-width": 2, "stroke-linejoin": "round" }, svg);
+    if (s.dots) for (const p of pts) el("circle", { cx: X(p[0]), cy: Y(p[1]), r: 4, fill: s.color, stroke: "var(--card)", "stroke-width": 2 }, svg);
+  }
+  const hair = el("line", { y1: m.t, y2: H - m.b, stroke: "var(--text3)", "stroke-width": 1, visibility: "hidden" }, svg);
+  const xs = [...new Set(o.series.flatMap((s) => s.pts.map((p) => p[0])))].sort((a, b) => a - b);
+  const hit = el("rect", { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, fill: "transparent" }, svg);
+  hit.onpointermove = (ev) => {
+    const r = svg.getBoundingClientRect(), px = ((ev.clientX - r.left) / r.width) * W;
+    const x = xs.reduce((a, b) => (Math.abs(X(b) - px) < Math.abs(X(a) - px) ? b : a));
+    hair.setAttribute("x1", X(x)); hair.setAttribute("x2", X(x)); hair.setAttribute("visibility", "visible");
+    const rows = o.series.map((s) => { const p = s.pts.find((q) => q[0] === x); return p && p[1] != null ? [s.name, o.tfmt(p, s), s.color] : null; }).filter(Boolean);
+    showTip(ev, o.xfmt(x), rows);
+  };
+  hit.onpointerleave = () => { hair.setAttribute("visibility", "hidden"); hideTip(); };
+}
+
+function barChart(parent, groups, label) {
+  const W = 760, H = 190, m = { t: 12, r: 16, b: 26, l: 40 };
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": label }, parent);
+  const Y = lin(0, 1, H - m.b, m.t), gw = (W - m.l - m.r) / groups.length;
+  for (const v of [0, 0.25, 0.5, 0.75, 1]) {
+    el("line", { class: "grid", x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v) }, svg);
+    el("text", { x: m.l - 6, y: Y(v) + 4, "text-anchor": "end" }, svg, Math.round(v * 100) + "%");
+  }
+  groups.forEach((g, i) => {
+    const n = g.vals.length, bw = Math.min(22, (gw - 12) / n - 2), x0 = m.l + i * gw + (gw - n * (bw + 2)) / 2;
+    el("text", { x: m.l + (i + 0.5) * gw, y: H - 8, "text-anchor": "middle" }, svg, g.label);
+    g.vals.forEach((b, j) => {
+      const h = Math.max(1, Y(0) - Y(b.v));
+      const r = el("rect", { x: x0 + j * (bw + 2), y: Y(0) - h, width: bw, height: h, rx: Math.min(4, h), fill: b.color, tabindex: 0 }, svg);
+      const hit = el("rect", { x: x0 + j * (bw + 2) - 1, y: m.t, width: bw + 2, height: H - m.t - m.b, fill: "transparent" }, svg);
+      hit.onpointermove = (ev) => { r.setAttribute("opacity", 0.8); showTip(ev, g.title, g.vals.map((q) => [q.name, Math.round(q.v * 100) + "%", q.color])); };
+      hit.onpointerleave = () => { r.removeAttribute("opacity"); hideTip(); };
+    });
+  });
+}
+
+function renderForecast(f) {
+  const root = $("#forecast");
+  root.replaceChildren();
+  const tz = f.site.tz, t = (s) => new Date(s).getTime();
+  const dfmt = new Intl.DateTimeFormat("en-GB", { timeZone: tz, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const day = new Intl.DateTimeFormat("en-GB", { timeZone: tz, weekday: "short", day: "numeric" });
+  $("#meta").textContent = `Issued ${dfmt.format(new Date(f.init_utc))} (${tz}) · input ${f.base_model} · trained ${f.model_trained.slice(0, 10)}`;
+  const h = f.hourly;
+  if (!h.length) { el("div", { class: "empty" }, root, "No forecast steps."); return; }
+  const x0 = t(h[0].valid_utc), x1 = t(h[h.length - 1].valid_utc), xt = [];
+  for (const s of h) { const d = new Date(s.valid_utc); if (new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", hour12: false }).format(d) === "12") xt.push([d.getTime(), day.format(d)]); }
+
+  for (const [key, title] of [["t2m", "Temperature, °C"], ["td2m", "Dewpoint, °C"]]) {
+    const c = card(root, title, "Line: median. Band: 10th to 90th percentile.", [["Gnostiq", COLOR.gnostiq], ["Raw model", COLOR.raw]]);
+    lineChart(c.body, {
+      label: title, x0, x1, xticks: xt, xfmt: (x) => dfmt.format(new Date(x)),
+      tfmt: (p) => (p[2] != null ? `${fx(p[1])} (${fx(p[2])} to ${fx(p[3])})` : fx(p[1])),
+      series: [
+        { name: "Gnostiq", color: COLOR.gnostiq, pts: h.map((s) => [t(s.valid_utc), s[key].q50, s[key].q10, s[key].q90]), band: h.map((s) => [t(s.valid_utc), s[key].q10, s[key].q90]) },
+        { name: "Raw model", color: COLOR.raw, pts: h.map((s) => [t(s.valid_utc), s.raw[key]]) },
+      ],
+    });
+    table(c.tv, ["Time", "q10", "Median", "q90", "Raw model"], h.filter((_, i) => i % 3 === 0).map((s) => [dfmt.format(new Date(s.valid_utc)), fx(s[key].q10), fx(s[key].q50), fx(s[key].q90), fx(s.raw[key])]));
+  }
+
+  const d = f.daily, wet = f.thresholds.wet_mm, heavy = f.thresholds.heavy_mm;
+  const c = card(root, "Chance of rain", `Per 24 h from ${d.length ? d[0].start_utc.slice(11, 16) : "00:00"} UTC.`, [[`At least ${wet} mm`, "var(--p1)", 1], [`At least ${heavy} mm`, "var(--p2)", 1]]);
+  if (!d.length) el("div", { class: "empty" }, c.body, "No complete days in range.");
+  else barChart(c.body, d.map((r) => ({ label: day.format(new Date(r.date + "T12:00Z")), title: r.date, vals: [{ name: `≥ ${wet} mm`, color: "var(--p1)", v: r.p_wet }, { name: `≥ ${heavy} mm`, color: "var(--p2)", v: r.p_heavy }] })), "Chance of rain by day");
+  table(c.tv, ["Day", `P ≥ ${wet} mm`, `P ≥ ${heavy} mm`, "Median mm", "q90 mm", "Raw model mm"], d.map((r) => [r.date, Math.round(r.p_wet * 100) + "%", Math.round(r.p_heavy * 100) + "%", fx(r.tp24.q50), fx(r.tp24.q90), fx(r.raw_tp24)]));
+}
+
+let CARD = null;
+function renderVerify() {
+  const root = $("#verify");
+  root.replaceChildren();
+  if (!CARD) return;
+  const v = $("#var").value, m = CARD.meta, rain = v === "tp24";
+  $("#vmeta").textContent = `Test window ${m.test[0]} to ${m.test[1]}, never used in training. Temperature truth: ${m.truth.temp}. Rain truth: ${m.truth.rain}.`;
+  const blk = rain ? CARD.daily : CARD.hourly[v];
+  if (!blk) { el("div", { class: "empty" }, root, "No scores for this variable."); return; }
+  const skill = rain ? blk.skill.crpss : blk.crpss, refs = Object.keys(skill || {}).filter((r) => r !== "clim");
+  const leads = [...new Set(refs.flatMap((r) => Object.keys(skill[r].by_lead)))].map(Number).sort((a, b) => a - b);
+
+  if (refs.length && leads.length) {
+    const c = card(root, "Skill by lead time (CRPSS)", `Above zero: better than the reference. Whiskers: 95% interval. ${blk.n_cases} cases.`, refs.map((r) => [`vs ${NAMES[r]}`, COLOR[r]]));
+    lineChart(c.body, {
+      label: "Skill by lead time", x0: leads[0] - 0.4, x1: leads[leads.length - 1] + 0.4, zero: 0, include: [0], h: 230,
+      xticks: leads.map((l) => [l, `day ${l}`]), xfmt: (x) => `Lead day ${x}`, yfmt: (y) => y.toFixed(2),
+      tfmt: (p) => `${sx(p[1])} [${sx(p[2])}, ${sx(p[3])}]`,
+      series: refs.map((r) => ({ name: `vs ${NAMES[r]}`, color: COLOR[r], dots: 1,
+        pts: leads.map((l) => { const s = skill[r].by_lead[l]; return [l, s ? s.skill : null, s ? s.lo : null, s ? s.hi : null]; }),
+        whisk: leads.map((l) => { const s = skill[r].by_lead[l]; return [l, s ? s.lo : null, s ? s.hi : null]; }) })),
+    });
+    table(c.tv, ["Lead day", ...refs.map((r) => `vs ${NAMES[r]}`)], leads.map((l) => [l, ...refs.map((r) => { const s = skill[r].by_lead[l]; return s ? `${sx(s.skill)} [${sx(s.lo)}, ${sx(s.hi)}]` : "-"; })]));
+  }
+
+  const sc = el("div", { class: "card" }, root);
+  el("h3", {}, sc, "Scores, all lead times");
+  const wrap = el("div", { class: "scroll", style: "margin-top:8px" }, sc);
+  const rank = (s) => (ORDER.indexOf(s) + 1 || 99);
+  const sys = Object.entries(blk.systems).sort((a, b) => rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0]));
+  if (rain) table(wrap, ["System", "Cases", "Brier wet", "Brier heavy", "CRPS mm", "ETS wet", "ETS heavy"], sys.map(([s, d]) => [label(s), d.overall.n, fx(d.overall.brier1, 3), fx(d.overall.brier10, 3), fx(d.overall.crps, 2), fx(d.overall.ets1, 2), fx(d.overall.ets10, 2)]));
+  else table(wrap, ["System", "Cases", "Bias °C", "MAE °C", "CRPS °C", "80% interval coverage"], sys.map(([s, d]) => [label(s), d.overall.n, fx(d.overall.bias, 2), fx(d.overall.mae, 2), fx(d.overall.crps, 2), d.overall.cov80 == null ? "-" : Math.round(d.overall.cov80 * 100) + "%"]));
+
+  if (rain && blk.reliability && blk.reliability.gnostiq) {
+    const names = ORDER.filter((s) => blk.reliability[s]);
+    const c = card(root, `Reliability, chance of at least ${m.thresholds.wet_mm} mm`, "On the diagonal: forecast probabilities match observed frequencies.", names.map((s) => [NAMES[s], COLOR[s]]));
+    lineChart(c.body, {
+      label: "Reliability diagram", x0: 0, x1: 1, ymin: 0, ymax: 1, diag: 1, h: 260,
+      xticks: [0, 0.2, 0.4, 0.6, 0.8, 1].map((x) => [x, Math.round(x * 100) + "%"]), yfmt: (y) => Math.round(y * 100) + "%",
+      xfmt: (x) => `Forecast ${Math.round(x * 100)}%`, tfmt: (p) => `${Math.round(p[1] * 100)}% observed, n=${p[2]}`,
+      series: names.map((s) => ({ name: NAMES[s], color: COLOR[s], dots: 1, pts: blk.reliability[s].p1.map((b) => [b.p, b.freq, b.n]) })),
+    });
+    table(c.tv, ["System", "Mean forecast", "Observed", "Cases"], names.flatMap((s) => blk.reliability[s].p1.map((b) => [NAMES[s], Math.round(b.p * 100) + "%", Math.round(b.freq * 100) + "%", b.n])));
+  }
+}
+
+function renderCases(k) {
+  const root = $("#cases");
+  root.replaceChildren();
+  $("#cmeta").textContent = `Wettest days in the test window. Each panel: chance of at least ${k.heavy_mm} mm as the day approached.`;
+  if (!k.cases.length) { el("div", { class: "empty" }, root, "No cases."); return; }
+  const grid = el("div", { class: "cases" }, root);
+  for (const cs of k.cases) {
+    const sys = ORDER.filter((s) => COLOR[s] && cs.systems[s]);
+    const c = card(grid, cs.date, `Observed ${fx(cs.obs_mm)} mm`, sys.map((s) => [NAMES[s], COLOR[s]]));
+    const leads = cs.systems[sys[0]].map((r) => r.lead_day);
+    const lo = Math.min(...leads), hi = Math.max(...leads);
+    lineChart(c.body, {
+      label: `Case ${cs.date}`, x0: -hi - 0.3, x1: -lo + 0.3, ymin: 0, ymax: 1, w: 300, h: 190,
+      xticks: leads.map((l) => [-l, `-${l}d`]), yfmt: (y) => Math.round(y * 100) + "%", xfmt: (x) => `${-x} days before`, tfmt: (p) => Math.round(p[1] * 100) + "%",
+      series: sys.map((s) => ({ name: NAMES[s], color: COLOR[s], dots: 1, pts: cs.systems[s].map((r) => [-r.lead_day, r.p_heavy]) })),
+    });
+    table(c.tv, ["Days before", ...sys.map((s) => NAMES[s])], leads.map((l) => [l, ...sys.map((s) => { const r = cs.systems[s].find((q) => q.lead_day === l); return r ? Math.round(r.p_heavy * 100) + "%" : "-"; })]));
+  }
+}
+
+async function load(url, sel, render, hint) {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(r.status);
+    render(await r.json());
+  } catch (e) {
+    $(sel).replaceChildren(el("div", { class: "empty" }, null, `Not available yet. Run: ${hint}`));
+  }
+}
+const hv = location.hash.slice(1);
+if (["t2m", "td2m", "tp24"].includes(hv)) $("#var").value = hv;
+$("#var").onchange = () => { history.replaceState(null, "", "#" + $("#var").value); renderVerify(); };
+load("/api/forecast", "#forecast", renderForecast, "gnostiq run");
+load("/api/verify", "#verify", (j) => { CARD = j; renderVerify(); }, "gnostiq verify");
+load("/api/cases", "#cases", renderCases, "gnostiq cases");
+</script>
+</body>
+</html>
