@@ -11,44 +11,44 @@ Use the block for your tool.
 ### Standard Python (`venv` / `virtualenv`)
 
 ```
-pytest                        # everything
-python -m pytest              # everything, explicit interpreter
-pytest tests/test_physics.py  # one file
+pytest                   # everything
+python -m pytest         # everything, explicit interpreter
+pytest tests/test_qc.py  # one file
 ```
 
 ### uv
 
 ```
-uv run pytest                        # everything
-uv run pytest tests/test_physics.py  # one file
+uv run pytest                   # everything
+uv run pytest tests/test_qc.py  # one file
 ```
 
 ### Poetry
 
 ```
-poetry run pytest                        # everything
-poetry run pytest tests/test_physics.py  # one file
+poetry run pytest                   # everything
+poetry run pytest tests/test_qc.py  # one file
 ```
 
 ### Pipenv
 
 ```
-pipenv run pytest                        # everything
-pipenv run pytest tests/test_physics.py  # one file
+pipenv run pytest                   # everything
+pipenv run pytest tests/test_qc.py  # one file
 ```
 
 ### Hatch
 
 ```
-hatch run pytest                        # everything
-hatch run pytest tests/test_physics.py  # one file
+hatch run pytest                   # everything
+hatch run pytest tests/test_qc.py  # one file
 ```
 
 ### PDM
 
 ```
-pdm run pytest                        # everything
-pdm run pytest tests/test_physics.py  # one file
+pdm run pytest                   # everything
+pdm run pytest tests/test_qc.py  # one file
 ```
 
 No test touches the network. Downloads are replaced with stand-ins, and anything that needs data uses synthetic files written in the real formats.
@@ -65,6 +65,9 @@ No test touches the network. Downloads are replaced with stand-ins, and anything
 | `tests/test_gate.py` | Runs the script on a good record, a pinned id, a daytime-only station and an empty lookup |
 | `tests/test_nwp.py` | Parsing a real response, chunking, request contents, refused groups, assembly, live fallback |
 | `tests/test_physics.py` | Formulas against known values, the terrain prior, wind sign, rain-day boundaries, fallbacks |
+| `tests/test_precip.py` | File paths, pixel reads, nodata, incremental pulls, preliminary to final, refused days |
+| `tests/test_static.py` | Terrain tile naming, model height from pressure, caching, the fallback order |
+| `tests/test_qc.py` | Each check on cases it must catch and cases it must leave alone; the full run |
 
 ## Setup
 
@@ -416,3 +419,162 @@ Two conventions are easy to get wrong and are pinned by tests:
 - The north-easterly wind component `ne` is positive when the wind blows from the north-east, which is Harmattan flow off the Sahara.
 
 A day with any missing hour is dropped rather than summed short.
+
+## Rain truth and terrain
+
+### CHIRPS
+
+When the station gauge is not usable, daily rain truth comes from CHIRPS v3. The daily files are global GeoTIFFs of 10 to 15 MB each, so downloading them whole is out of the question. Instead `precip.py` opens each one over HTTP and reads only the 3 by 3 block of pixels around the station, about 15 km across. It keeps the centre pixel and the block mean; the block mean is what is used as truth.
+
+#### Standard Python (`venv` / `virtualenv`)
+
+```
+gnostiq pull --only precip
+```
+
+#### uv
+
+```
+uv run gnostiq pull --only precip
+```
+
+#### Poetry
+
+```
+poetry run gnostiq pull --only precip
+```
+
+#### Pipenv
+
+```
+pipenv run gnostiq pull --only precip
+```
+
+#### Hatch
+
+```
+hatch run gnostiq pull --only precip
+```
+
+#### PDM
+
+```
+pdm run gnostiq pull --only precip
+```
+
+The series is kept in `data/raw/chirps/chirps_<flavor>.parquet` with columns `day`, `pt`, `tp24`, `stage`.
+
+- `truth.chirps_flavor = "sat"` takes its day-to-day timing from IMERG satellite estimates, `"rnl"` from ERA5. `sat` is the default because ERA5 is itself an ECMWF product, and scoring an ECMWF forecast against ECMWF-timed rain would flatter it.
+- Recent days come from the preliminary product until the final one is published, around the third week of the following month. Preliminary days are read again on every pull and replaced when the final file appears.
+- The server rate-limits. One test request came back with a 429. A day it refuses is not stored, so the next pull tries it again. Re-run until the log says `0 not read`. The first full pull is about 2,100 small reads and can take 20 to 60 minutes.
+
+On a plain `gnostiq pull`, CHIRPS is skipped when `truth.rain = "station"`. Name it with `--only precip` to fetch it anyway.
+
+File paths were checked against the server's directory listing on 2026-11-17. Final `sat` files existed through October 2026.
+
+CHIRPS daily totals are treated as running 00 to 00 UTC. That is an assumption to check against a few known storm dates.
+
+### Terrain
+
+#### Standard Python (`venv` / `virtualenv`)
+
+```
+gnostiq pull --only static
+```
+
+#### uv
+
+```
+uv run gnostiq pull --only static
+```
+
+#### Poetry
+
+```
+poetry run gnostiq pull --only static
+```
+
+#### Pipenv
+
+```
+pipenv run gnostiq pull --only static
+```
+
+#### Hatch
+
+```
+hatch run gnostiq pull --only static
+```
+
+#### PDM
+
+```
+pdm run gnostiq pull --only static
+```
+
+writes `data/processed/static.json`:
+
+| Key | Meaning |
+|---|---|
+| `z_station` | Station height from the config |
+| `z_model_hyps` | Height of the model grid cell, worked out from the model's own surface and sea-level pressure |
+| `z_model_api` | The elevation Open-Meteo reports for the cell |
+| `z_dem_point`, `z_dem_9km` | Copernicus 30 m terrain at the station, and averaged over about 9 km |
+
+The correction for terrain is driven by station height minus model height. `static.z_model()` prefers the pressure-derived figure, then the API's. If neither is on file it falls back to the station height, which switches the correction off and logs a warning. A failed terrain download does not stop the pull; the DEM figures are for the gate and for your own checking, not for the model.
+
+## Quality control
+
+Station reports are checked before anything is trained or scored against them. A value that fails a check is removed. Nothing is repaired or interpolated.
+
+### Standard Python (`venv` / `virtualenv`)
+
+```
+gnostiq build
+```
+
+### uv
+
+```
+uv run gnostiq build
+```
+
+### Poetry
+
+```
+poetry run gnostiq build
+```
+
+### Pipenv
+
+```
+pipenv run gnostiq build
+```
+
+### Hatch
+
+```
+hatch run gnostiq build
+```
+
+### PDM
+
+```
+pdm run gnostiq build
+```
+
+now also writes `data/interim/obs.parquet` (`valid`, `t`, `td`, `src`) and a tally in `data/reports/qc.md`.
+
+| Check | Rule |
+|---|---|
+| Range | Temperature within -10 to 50 degC, dewpoint within -40 to 35 degC |
+| Dewpoint above temperature | Up to 0.5 degC over is rounding and is set equal to temperature. More than that is a bad report and the dewpoint is dropped. |
+| Spike | More than 8 degC away from both neighbours, in the same direction, with both neighbours within 3 hours |
+| Flatline | 12 or more identical readings in a row spanning at least 24 hours |
+| Climatological outlier | Further from the median for that month and hour than the larger of 8 degC and six robust standard deviations, where there are at least 10 readings to judge by |
+
+A dewpoint with no temperature beside it is dropped too, since it cannot be checked.
+
+The rules are deliberately loose. A real cold front is a large jump that persists, so it is not a spike. Whole-degree METAR temperatures repeat for hours on a calm night, so a short run of identical values is not a flatline. Both cases have tests.
+
+Read `data/reports/qc.md` after the first real build. A check that removes hundreds of values is telling you something about the station or about the check.

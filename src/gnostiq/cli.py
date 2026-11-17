@@ -5,26 +5,31 @@ import logging
 
 from gnostiq import cfg
 
-SOURCES = ["station", "nwp"]
+SOURCES = ["static", "station", "nwp", "precip"]
 
 
 def pull(c, a):
-    from gnostiq.ingest import nwp, station
+    from gnostiq.ingest import nwp, precip, static, station
 
-    mods = {"station": station, "nwp": nwp}
+    mods = {"static": static, "station": station, "nwp": nwp, "precip": precip}
     only = a.only.split(",") if a.only else SOURCES
     bad = [s for s in only if s not in mods]
     if bad:
         raise SystemExit(f"unknown source {bad}; choose from {SOURCES}")
     for s in only:
+        # chirps only matters when it is the rain truth
+        if s == "precip" and c.truth.rain != "chirps" and not a.only:
+            continue
         mods[s].pull(c, refresh=a.refresh)
 
 
 def build(c, a):
+    from gnostiq import qc
     from gnostiq.ingest import nwp, station
 
     station.build(c)
     nwp.build(c)
+    qc.run(c)
 
 
 def main(argv=None):

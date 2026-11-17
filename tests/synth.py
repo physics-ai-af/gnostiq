@@ -5,7 +5,7 @@ import json
 import numpy as np
 import pandas as pd
 
-from gnostiq.ingest import nwp
+from gnostiq.ingest import nwp, precip
 
 Z_MODEL = 1000.0
 # null in the live archive for ecmwf_ifs025
@@ -141,6 +141,16 @@ def write_nwp(c, tru, daily, rng, bare=False):
                 )
 
 
+def write_chirps(c, daily, rng):
+    out = daily.copy()
+    out["tp24"] = (out.tp24 * rng.lognormal(0, 0.15, len(out))).round(2)
+    out["pt"] = out.tp24
+    out["stage"] = "final"
+    path = precip.cache(c)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    out[["day", "pt", "tp24", "stage"]].to_parquet(path, index=False)
+
+
 def live_frame(c, init, seed=1):
     rng = np.random.default_rng(seed)
     t = pd.date_range(init.floor("D") - pd.Timedelta(days=2), periods=11 * 24, freq="h")
@@ -150,3 +160,14 @@ def live_frame(c, init, seed=1):
     tru = pd.DataFrame({"valid": t, "t": temp, "td": temp - (2 + 13 * dry), "dry": dry})
     daily = pd.DataFrame({"day": pd.date_range(t[0], periods=11, freq="D"), "tp24": rng.gamma(0.9, 8, 11)})
     return pd.DataFrame({"valid": t, **model_fields(tru, daily, 1, rng)})
+
+
+def make(c, end, seed=0, bare=False):
+    rng = np.random.default_rng(seed + 100)
+    tru, daily = truth(c, end, seed)
+    c.paths.ensure()
+    write_station(c, tru, rng)
+    write_nwp(c, tru, daily, rng, bare)
+    write_chirps(c, daily, rng)
+    static = {"z_station": c.site.elev, "z_model_hyps": Z_MODEL, "z_model_api": None, "base": c.nwp.base}
+    (c.paths.processed / "static.json").write_text(json.dumps(static))
