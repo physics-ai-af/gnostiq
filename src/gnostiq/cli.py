@@ -68,6 +68,14 @@ def everything(c, a):
         step(c, a)
 
 
+def serve(c, a):
+    import uvicorn
+
+    from gnostiq import api
+
+    uvicorn.run(api.create(c), host=a.host, port=a.port, log_level="info")
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="gnostiq")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -87,6 +95,9 @@ def main(argv=None):
     add("cases", cases, "write the heavy-rain case replays")
     add("all", everything, "build, baselines, train, verify, cases")
     add("run", run, "fetch the latest forecast and write forecast.json")
+    s = add("serve", serve, "serve the API and web page")
+    s.add_argument("--host", default="127.0.0.1")
+    s.add_argument("--port", type=int, default=8000)
 
     a = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
