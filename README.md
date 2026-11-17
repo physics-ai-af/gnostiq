@@ -11,44 +11,44 @@ Use the block for your tool.
 ### Standard Python (`venv` / `virtualenv`)
 
 ```bash
-pytest                     # everything
-python -m pytest           # everything, explicit interpreter
-pytest tests/test_gate.py  # one file
+pytest                    # everything
+python -m pytest          # everything, explicit interpreter
+pytest tests/test_nwp.py  # one file
 ```
 
 ### uv
 
 ```bash
-uv run pytest                     # everything
-uv run pytest tests/test_gate.py  # one file
+uv run pytest                    # everything
+uv run pytest tests/test_nwp.py  # one file
 ```
 
 ### Poetry
 
 ```bash
-poetry run pytest                     # everything
-poetry run pytest tests/test_gate.py  # one file
+poetry run pytest                    # everything
+poetry run pytest tests/test_nwp.py  # one file
 ```
 
 ### Pipenv
 
 ```bash
-pipenv run pytest                     # everything
-pipenv run pytest tests/test_gate.py  # one file
+pipenv run pytest                    # everything
+pipenv run pytest tests/test_nwp.py  # one file
 ```
 
 ### Hatch
 
 ```bash
-hatch run pytest                     # everything
-hatch run pytest tests/test_gate.py  # one file
+hatch run pytest                    # everything
+hatch run pytest tests/test_nwp.py  # one file
 ```
 
 ### PDM
 
 ```bash
-pdm run pytest                     # everything
-pdm run pytest tests/test_gate.py  # one file
+pdm run pytest                    # everything
+pdm run pytest tests/test_nwp.py  # one file
 ```
 
 No test touches the network. Downloads are replaced with stand-ins, and anything that needs data uses synthetic files written in the real formats.
@@ -63,6 +63,7 @@ No test touches the network. Downloads are replaced with stand-ins, and anything
 | `tests/test_station.py` | Parsing both sources, NOAA quality flags, trace rain, rain-day rules, station lookup, merge modes |
 | `tests/test_cli.py` | Argument handling, unknown sources, data directories, helpful errors |
 | `tests/test_gate.py` | Runs the script on a good record, a pinned id, a daytime-only station and an empty lookup |
+| `tests/test_nwp.py` | Parsing a real response, chunking, request contents, refused groups, assembly, live fallback |
 
 ## Setup
 
@@ -323,3 +324,75 @@ What it measures:
 The thresholds are constants at the top of the script. They are working numbers, not a standard. Look at one real report before changing them.
 
 A FAIL is often just a station that does not report at night. That shows up plainly in the hour-of-day table. Such a station can still verify daytime hours with `truth.temp = "merged"`, but then say so wherever you publish scores.
+
+## Forecast archive
+
+Past forecasts for the Jos grid cell, from Open-Meteo's Previous Runs API. For every hour it gives the value that was forecast one day earlier, two days earlier, and so on up to seven. That is what makes it possible to train and score by lead time without storing every model run.
+
+### Standard Python (`venv` / `virtualenv`)
+
+```bash
+gnostiq pull --only nwp
+gnostiq build
+```
+
+### uv
+
+```bash
+uv run gnostiq pull --only nwp
+uv run gnostiq build
+```
+
+### Poetry
+
+```bash
+poetry run gnostiq pull --only nwp
+poetry run gnostiq build
+```
+
+### Pipenv
+
+```bash
+pipenv run gnostiq pull --only nwp
+pipenv run gnostiq build
+```
+
+### Hatch
+
+```bash
+hatch run gnostiq pull --only nwp
+hatch run gnostiq build
+```
+
+### PDM
+
+```bash
+pdm run gnostiq pull --only nwp
+pdm run gnostiq build
+```
+
+`pull` asks for 92-day chunks and keeps each as a JSON file under `data/raw/nwp/<model>/`. `build` turns them into `data/interim/nwp_<model>.parquet`, one row per valid hour and lead day, with short column names (`f_t2m`, `f_td2m`, `f_tp`, `f_msl`, `f_sp`, `f_cloud`, `f_wspd`, `f_wdir`, and more where the archive has them).
+
+Three details that matter:
+
+- Requests pass `elevation=nan`. Without it Open-Meteo adjusts temperature to a fine terrain model, and the "raw" forecast would no longer be raw.
+- Variables are requested in three groups (`core`, `column`, `levels`). If the archive refuses a group, a `<group>.missing` marker is written and the group is not asked for again until you pass `--refresh`. Only a refusal of the base model's core group stops the pull.
+- The extra models are only ever scored as raw baselines, so only their core group is fetched.
+
+### What the live archive actually serves
+
+Checked by hand in a browser on 2026-11-17:
+
+| Request | Result |
+|---|---|
+| `ecmwf_ifs025`, core variables | Works. Lead days 1 and 7 both filled. Grid cell centre 9.75 N 9.0 E, height 1182 m. |
+| `ecmwf_ifs025`, CAPE and column water vapour | Served, but every value is null |
+| `ecmwf_ifs025`, pressure-level fields | Refused with a 400. Expect one warning on the first pull. |
+| `gfs_seamless` | Works, including CAPE |
+| `icon_seamless` | Works at short leads. Lead day 7 is null. |
+
+So for the base model the usable inputs are the core set plus shortwave radiation. The code copes with that without special cases: empty columns are simply not used.
+
+`nwp.live(c)` fetches the newest run from the ordinary forecast API. The live-forecast branch uses it later.
+
+The free Open-Meteo API is for non-commercial use and needs attribution.

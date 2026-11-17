@@ -5,13 +5,13 @@ import logging
 
 from gnostiq import cfg
 
-SOURCES = ["station"]
+SOURCES = ["station", "nwp"]
 
 
 def pull(c, a):
-    from gnostiq.ingest import station
+    from gnostiq.ingest import nwp, station
 
-    mods = {"station": station}
+    mods = {"station": station, "nwp": nwp}
     only = a.only.split(",") if a.only else SOURCES
     bad = [s for s in only if s not in mods]
     if bad:
@@ -21,9 +21,10 @@ def pull(c, a):
 
 
 def build(c, a):
-    from gnostiq.ingest import station
+    from gnostiq.ingest import nwp, station
 
     station.build(c)
+    nwp.build(c)
 
 
 def main(argv=None):

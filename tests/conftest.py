@@ -43,3 +43,11 @@ def station_raw(tmp_path_factory):
     tru, _ = synth.truth(c, SYNTH_END)
     synth.write_station(c, tru, np.random.default_rng(1))
     return c
+
+
+@pytest.fixture(scope="session")
+def nwp_raw(tmp_path_factory):
+    c = cfg.load(write_cfg(tmp_path_factory.mktemp("nwp"), SMALL))
+    tru, daily = synth.truth(c, SYNTH_END)
+    synth.write_nwp(c, tru, daily, np.random.default_rng(2), bare=True)
+    return c
