@@ -10,45 +10,45 @@ Use the block for your tool.
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
-pytest                       # everything
-python -m pytest             # everything, explicit interpreter
-pytest tests/test_verify.py  # one file
+```bash
+pytest                      # everything
+python -m pytest            # everything, explicit interpreter
+pytest tests/test_model.py  # one file
 ```
 
 ### uv
 
-```
-uv run pytest                       # everything
-uv run pytest tests/test_verify.py  # one file
+```bash
+uv run pytest                      # everything
+uv run pytest tests/test_model.py  # one file
 ```
 
 ### Poetry
 
-```
-poetry run pytest                       # everything
-poetry run pytest tests/test_verify.py  # one file
+```bash
+poetry run pytest                      # everything
+poetry run pytest tests/test_model.py  # one file
 ```
 
 ### Pipenv
 
-```
-pipenv run pytest                       # everything
-pipenv run pytest tests/test_verify.py  # one file
+```bash
+pipenv run pytest                      # everything
+pipenv run pytest tests/test_model.py  # one file
 ```
 
 ### Hatch
 
-```
-hatch run pytest                       # everything
-hatch run pytest tests/test_verify.py  # one file
+```bash
+hatch run pytest                      # everything
+hatch run pytest tests/test_model.py  # one file
 ```
 
 ### PDM
 
-```
-pdm run pytest                       # everything
-pdm run pytest tests/test_verify.py  # one file
+```bash
+pdm run pytest                      # everything
+pdm run pytest tests/test_model.py  # one file
 ```
 
 No test touches the network. Downloads are replaced with stand-ins, and anything that needs data uses synthetic files written in the real formats.
@@ -72,6 +72,7 @@ No test touches the network. Downloads are replaced with stand-ins, and anything
 | `tests/test_dist.py` | CRPS against sampling, point forecasts, rain quantiles and exceedance |
 | `tests/test_baselines.py` | Each baseline recovers a known signal; no test-window leakage; persistence timing |
 | `tests/test_verify.py` | Threat score, bootstrap, reliability bins, common cases, a baseline-only scorecard |
+| `tests/test_model.py` | The untrained net returns the prior; constraints hold for random weights; losses; round trip |
 
 ## Setup
 
@@ -79,7 +80,7 @@ You need Python 3.12 or newer. There are no API keys and no accounts. Each block
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 python -m venv .venv                   # or: virtualenv .venv
 source .venv/bin/activate              # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
@@ -99,7 +100,7 @@ The requirements files list direct dependencies only, so pip still picks version
 
 ### uv
 
-```
+```bash
 uv sync
 uv run pytest
 uv run ruff check . && uv run ruff format --check .
@@ -109,7 +110,7 @@ uv run ruff check . && uv run ruff format --check .
 
 ### Poetry
 
-```
+```bash
 poetry install
 poetry run pytest
 poetry run ruff check . && poetry run ruff format --check .
@@ -119,7 +120,7 @@ Poetry reads the standard `[project]` and `[dependency-groups]` tables, so there
 
 ### Pipenv
 
-```
+```bash
 pipenv install --dev
 pipenv run pytest
 pipenv run ruff check . && pipenv run ruff format --check .
@@ -129,7 +130,7 @@ Pipenv does not read `pyproject.toml`. It reads the `Pipfile`, which carries the
 
 ### Hatch
 
-```
+```bash
 hatch env create
 hatch run pytest
 hatch run ruff check . && hatch run ruff format --check .
@@ -139,7 +140,7 @@ hatch run ruff check . && hatch run ruff format --check .
 
 ### PDM
 
-```
+```bash
 pdm install
 pdm run pytest
 pdm run ruff check . && pdm run ruff format --check .
@@ -204,42 +205,42 @@ Run the ingestion with the block for your tool:
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 gnostiq pull   # download both into data/raw/station/
 gnostiq build  # parse and merge into data/interim/
 ```
 
 ### uv
 
-```
+```bash
 uv run gnostiq pull   # download both into data/raw/station/
 uv run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### Poetry
 
-```
+```bash
 poetry run gnostiq pull   # download both into data/raw/station/
 poetry run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### Pipenv
 
-```
+```bash
 pipenv run gnostiq pull   # download both into data/raw/station/
 pipenv run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### Hatch
 
-```
+```bash
 hatch run gnostiq pull   # download both into data/raw/station/
 hatch run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### PDM
 
-```
+```bash
 pdm run gnostiq pull   # download both into data/raw/station/
 pdm run gnostiq build  # parse and merge into data/interim/
 ```
@@ -273,42 +274,42 @@ Run this before any modelling. It answers one question: is the Jos record good e
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 python scripts/gate.py              # looks the station up by WMO number
 python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### uv
 
-```
+```bash
 uv run python scripts/gate.py              # looks the station up by WMO number
 uv run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### Poetry
 
-```
+```bash
 poetry run python scripts/gate.py              # looks the station up by WMO number
 poetry run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### Pipenv
 
-```
+```bash
 pipenv run python scripts/gate.py              # looks the station up by WMO number
 pipenv run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### Hatch
 
-```
+```bash
 hatch run python scripts/gate.py              # looks the station up by WMO number
 hatch run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### PDM
 
-```
+```bash
 pdm run python scripts/gate.py              # looks the station up by WMO number
 pdm run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
@@ -339,42 +340,42 @@ Past forecasts for the Jos grid cell, from Open-Meteo's Previous Runs API. For e
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 gnostiq pull --only nwp
 gnostiq build
 ```
 
 ### uv
 
-```
+```bash
 uv run gnostiq pull --only nwp
 uv run gnostiq build
 ```
 
 ### Poetry
 
-```
+```bash
 poetry run gnostiq pull --only nwp
 poetry run gnostiq build
 ```
 
 ### Pipenv
 
-```
+```bash
 pipenv run gnostiq pull --only nwp
 pipenv run gnostiq build
 ```
 
 ### Hatch
 
-```
+```bash
 hatch run gnostiq pull --only nwp
 hatch run gnostiq build
 ```
 
 ### PDM
 
-```
+```bash
 pdm run gnostiq pull --only nwp
 pdm run gnostiq build
 ```
@@ -432,37 +433,37 @@ When the station gauge is not usable, daily rain truth comes from CHIRPS v3. The
 
 #### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 gnostiq pull --only precip
 ```
 
 #### uv
 
-```
+```bash
 uv run gnostiq pull --only precip
 ```
 
 #### Poetry
 
-```
+```bash
 poetry run gnostiq pull --only precip
 ```
 
 #### Pipenv
 
-```
+```bash
 pipenv run gnostiq pull --only precip
 ```
 
 #### Hatch
 
-```
+```bash
 hatch run gnostiq pull --only precip
 ```
 
 #### PDM
 
-```
+```bash
 pdm run gnostiq pull --only precip
 ```
 
@@ -482,37 +483,37 @@ CHIRPS daily totals are treated as running 00 to 00 UTC. That is an assumption t
 
 #### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 gnostiq pull --only static
 ```
 
 #### uv
 
-```
+```bash
 uv run gnostiq pull --only static
 ```
 
 #### Poetry
 
-```
+```bash
 poetry run gnostiq pull --only static
 ```
 
 #### Pipenv
 
-```
+```bash
 pipenv run gnostiq pull --only static
 ```
 
 #### Hatch
 
-```
+```bash
 hatch run gnostiq pull --only static
 ```
 
 #### PDM
 
-```
+```bash
 pdm run gnostiq pull --only static
 ```
 
@@ -533,37 +534,37 @@ Station reports are checked before anything is trained or scored against them. A
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 gnostiq build
 ```
 
 ### uv
 
-```
+```bash
 uv run gnostiq build
 ```
 
 ### Poetry
 
-```
+```bash
 poetry run gnostiq build
 ```
 
 ### Pipenv
 
-```
+```bash
 pipenv run gnostiq build
 ```
 
 ### Hatch
 
-```
+```bash
 hatch run gnostiq build
 ```
 
 ### PDM
 
-```
+```bash
 pdm run gnostiq build
 ```
 
@@ -606,37 +607,37 @@ These are the forecasts the model has to beat. They are built before the model e
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 gnostiq baselines
 ```
 
 ### uv
 
-```
+```bash
 uv run gnostiq baselines
 ```
 
 ### Poetry
 
-```
+```bash
 poetry run gnostiq baselines
 ```
 
 ### Pipenv
 
-```
+```bash
 pipenv run gnostiq baselines
 ```
 
 ### Hatch
 
-```
+```bash
 hatch run gnostiq baselines
 ```
 
 ### PDM
 
-```
+```bash
 pdm run gnostiq baselines
 ```
 
@@ -664,37 +665,37 @@ Outputs, both under `data/processed/`:
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 gnostiq verify  # or: gnostiq all
 ```
 
 ### uv
 
-```
+```bash
 uv run gnostiq verify  # or: gnostiq all
 ```
 
 ### Poetry
 
-```
+```bash
 poetry run gnostiq verify  # or: gnostiq all
 ```
 
 ### Pipenv
 
-```
+```bash
 pipenv run gnostiq verify  # or: gnostiq all
 ```
 
 ### Hatch
 
-```
+```bash
 hatch run gnostiq verify  # or: gnostiq all
 ```
 
 ### PDM
 
-```
+```bash
 pdm run gnostiq verify  # or: gnostiq all
 ```
 
@@ -711,3 +712,45 @@ How it keeps the comparison fair:
 Also reported: bias, mean absolute error, how often the 80% interval contained the truth, equitable threat score for rain, results by lead day and by month, and reliability tables for the rain probabilities.
 
 Start with the lines `CRPSS vs emos`.
+
+## Correction networks
+
+`src/gnostiq/model.py` defines the two networks and their losses. There is nothing to run yet; training comes in the next branch.
+
+Both are small: two hidden layers, 64 units by default. The physics is built into what the outputs mean, so no output ever needs clipping afterwards.
+
+**Hourly network (temperature and dewpoint)**
+
+- Temperature is the terrain-corrected forecast plus a learned correction.
+- Dewpoint is temperature minus a depression, and the depression goes through a softplus, so it is always positive. Dewpoint cannot come out above temperature for any input or any weights.
+- The last layer starts at zero. An untrained network returns the physics prior exactly, and training only has to learn what the prior gets wrong.
+- Loss: CRPS of a normal distribution. Hours with no observed dewpoint still train the temperature side.
+
+**Daily network (rain)**
+
+- A probability of a wet day, and a gamma distribution for how much falls beyond the wet threshold.
+- The mean amount is a learned efficiency times the moisture available in the column. Efficiency above `model.eff_max` (2 by default) is penalised. The cap is soft and above one because a day of converging air can rain out more than the column holds at any one moment.
+- Loss: log loss for wet or dry, gamma log-likelihood for the amount on wet days.
+
+`fit_stats` and `design` handle missing inputs. A predictor that is mostly empty or constant in training is left out; the odd missing value is filled with the training median.
+
+`save` and `load` store a bundle: the weights for each seed, the scaling statistics and the settings. `predict_hourly` and `predict_daily` average over the seeds.
+
+This branch adds PyTorch. The standard PyTorch download for Linux bundles about 2.5 GB of CUDA libraries for NVIDIA GPUs, which nothing here uses. Every tool is set up to fetch the CPU-only build from `https://download.pytorch.org/whl/cpu` instead:
+
+| Tool | Where it is set | What happens |
+|---|---|---|
+| pip | `--extra-index-url` at the top of `requirements.txt` | pip sees `torch 2.15.0` on PyPI and `torch 2.15.0+cpu` on the PyTorch index, and takes `+cpu` because a local version sorts higher |
+| uv | `[tool.uv.sources]` and `[[tool.uv.index]]` in `pyproject.toml` | torch comes from the PyTorch index on Linux and Windows, everything else from PyPI |
+| Poetry | `[[tool.poetry.source]]` and `[tool.poetry.dependencies]` in `pyproject.toml` | torch comes from the PyTorch index, everything else from PyPI |
+| Pipenv | a second `[[source]]` and `index = "pytorch-cpu"` on torch in `Pipfile` | Same |
+| Hatch | `PIP_EXTRA_INDEX_URL` under `[tool.hatch.envs.default.env-vars]` | Hatch installs with pip, so it behaves as the pip row |
+| PDM | `[[tool.pdm.source]]` with `include_packages = ["torch"]` and `exclude_packages = ["*"]` | torch comes only from the PyTorch index, everything else only from PyPI |
+
+What was checked: each tool, asked to resolve this branch, went to the PyTorch index for torch, and Poetry, PDM and Pipenv went there for nothing else. The PyTorch index was unreachable from the machine these files were built on, so no tool was run through to an installed CPU build. If one of them still pulls `nvidia-*` packages, install torch on its own first, for example `pip install torch==2.15.0 --index-url https://download.pytorch.org/whl/cpu`, and run the install again.
+
+PDM needs both settings. With `include_packages` alone it also looks up every other package on the PyTorch index.
+
+Poetry, Pipenv and PDM send torch to the PyTorch index on macOS as well. uv uses PyPI on macOS, where the standard build has no CUDA in it anyway.
+
+Use the requirements files with pip only. uv takes a package from the first index that has it, and the PyTorch index carries its own copies of numpy and other packages, so `uv pip install -r requirements.txt` can fail on a pin. With uv, use `uv sync`.

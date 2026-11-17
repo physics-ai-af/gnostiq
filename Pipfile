@@ -3,6 +3,11 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 name = "pypi"
 
+[[source]]
+url = "https://download.pytorch.org/whl/cpu"
+verify_ssl = true
+name = "pytorch-cpu"
+
 [packages]
 gnostiq = {path = ".", editable = true}
 numpy = "==2.5.5"
@@ -11,6 +16,7 @@ pyarrow = "==26.0.1"
 rasterio = "==1.5.2"
 requests = "==2.34.2"
 scipy = "==1.18.1"
+torch = {version = "==2.15.0", index = "pytorch-cpu"}
 tzdata = "==2026.6"
 
 [dev-packages]
