@@ -1,7 +1,12 @@
 import sys
 from pathlib import Path
 
+import numpy as np
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent))
+
+import synth  # noqa: E402
 
 from gnostiq import cfg  # noqa: E402
 
@@ -19,6 +24,7 @@ SMALL = {
     "max_epochs = 300": "max_epochs = 6",
     "patience = 25": "patience = 3",
 }
+SYNTH_END = "2025-07-05"
 
 
 def write_cfg(tmp_path, edits=None):
@@ -29,3 +35,11 @@ def write_cfg(tmp_path, edits=None):
     p = tmp_path / cfg.FILENAME
     p.write_text(text)
     return p
+
+
+@pytest.fixture(scope="session")
+def station_raw(tmp_path_factory):
+    c = cfg.load(write_cfg(tmp_path_factory.mktemp("station"), SMALL))
+    tru, _ = synth.truth(c, SYNTH_END)
+    synth.write_station(c, tru, np.random.default_rng(1))
+    return c
