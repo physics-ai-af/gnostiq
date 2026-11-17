@@ -1,0 +1,10 @@
+[Unit]
+Description=Gnostiq live forecast
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=gnostiq
+WorkingDirectory=/opt/gnostiq/app
+ExecStart=/opt/gnostiq/app/.venv/bin/gnostiq run
