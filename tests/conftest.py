@@ -76,3 +76,11 @@ def pairs(built):
     qc.run(built)
     align.build(built)
     return built
+
+
+@pytest.fixture(scope="session")
+def based(pairs):
+    from gnostiq import baselines
+
+    baselines.run(pairs)
+    return pairs

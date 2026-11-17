@@ -33,6 +33,12 @@ def build(c, a):
     align.build(c)
 
 
+def baselines(c, a):
+    from gnostiq import baselines
+
+    baselines.run(c)
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="gnostiq")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -46,6 +52,7 @@ def main(argv=None):
     s.add_argument("--only", help=f"comma-separated subset of {','.join(SOURCES)}")
     s.add_argument("--refresh", action="store_true", help="re-download files that change over time")
     add("build", build, "parse raw files into the working tables")
+    add("baselines", baselines, "fit the reference forecasts")
 
     a = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")

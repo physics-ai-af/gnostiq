@@ -10,45 +10,45 @@ Use the block for your tool.
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
-pytest                      # everything
-python -m pytest            # everything, explicit interpreter
-pytest tests/test_align.py  # one file
+```
+pytest                          # everything
+python -m pytest                # everything, explicit interpreter
+pytest tests/test_baselines.py  # one file
 ```
 
 ### uv
 
-```bash
-uv run pytest                      # everything
-uv run pytest tests/test_align.py  # one file
+```
+uv run pytest                          # everything
+uv run pytest tests/test_baselines.py  # one file
 ```
 
 ### Poetry
 
-```bash
-poetry run pytest                      # everything
-poetry run pytest tests/test_align.py  # one file
+```
+poetry run pytest                          # everything
+poetry run pytest tests/test_baselines.py  # one file
 ```
 
 ### Pipenv
 
-```bash
-pipenv run pytest                      # everything
-pipenv run pytest tests/test_align.py  # one file
+```
+pipenv run pytest                          # everything
+pipenv run pytest tests/test_baselines.py  # one file
 ```
 
 ### Hatch
 
-```bash
-hatch run pytest                      # everything
-hatch run pytest tests/test_align.py  # one file
+```
+hatch run pytest                          # everything
+hatch run pytest tests/test_baselines.py  # one file
 ```
 
 ### PDM
 
-```bash
-pdm run pytest                      # everything
-pdm run pytest tests/test_align.py  # one file
+```
+pdm run pytest                          # everything
+pdm run pytest tests/test_baselines.py  # one file
 ```
 
 No test touches the network. Downloads are replaced with stand-ins, and anything that needs data uses synthetic files written in the real formats.
@@ -69,6 +69,8 @@ No test touches the network. Downloads are replaced with stand-ins, and anything
 | `tests/test_static.py` | Terrain tile naming, model height from pressure, caching, the fallback order |
 | `tests/test_qc.py` | Each check on cases it must catch and cases it must leave alone; the full run |
 | `tests/test_align.py` | Split boundaries, the joins, rain-day sums, truth source selection, missing inputs |
+| `tests/test_dist.py` | CRPS against sampling, point forecasts, rain quantiles and exceedance |
+| `tests/test_baselines.py` | Each baseline recovers a known signal; no test-window leakage; persistence timing |
 
 ## Setup
 
@@ -76,7 +78,7 @@ You need Python 3.12 or newer. There are no API keys and no accounts. Each block
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 python -m venv .venv                   # or: virtualenv .venv
 source .venv/bin/activate              # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
@@ -96,7 +98,7 @@ The requirements files list direct dependencies only, so pip still picks version
 
 ### uv
 
-```bash
+```
 uv sync
 uv run pytest
 uv run ruff check . && uv run ruff format --check .
@@ -106,7 +108,7 @@ uv run ruff check . && uv run ruff format --check .
 
 ### Poetry
 
-```bash
+```
 poetry install
 poetry run pytest
 poetry run ruff check . && poetry run ruff format --check .
@@ -116,7 +118,7 @@ Poetry reads the standard `[project]` and `[dependency-groups]` tables, so there
 
 ### Pipenv
 
-```bash
+```
 pipenv install --dev
 pipenv run pytest
 pipenv run ruff check . && pipenv run ruff format --check .
@@ -126,7 +128,7 @@ Pipenv does not read `pyproject.toml`. It reads the `Pipfile`, which carries the
 
 ### Hatch
 
-```bash
+```
 hatch env create
 hatch run pytest
 hatch run ruff check . && hatch run ruff format --check .
@@ -136,7 +138,7 @@ hatch run ruff check . && hatch run ruff format --check .
 
 ### PDM
 
-```bash
+```
 pdm install
 pdm run pytest
 pdm run ruff check . && pdm run ruff format --check .
@@ -201,42 +203,42 @@ Run the ingestion with the block for your tool:
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq pull   # download both into data/raw/station/
 gnostiq build  # parse and merge into data/interim/
 ```
 
 ### uv
 
-```bash
+```
 uv run gnostiq pull   # download both into data/raw/station/
 uv run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run gnostiq pull   # download both into data/raw/station/
 poetry run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run gnostiq pull   # download both into data/raw/station/
 pipenv run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run gnostiq pull   # download both into data/raw/station/
 hatch run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### PDM
 
-```bash
+```
 pdm run gnostiq pull   # download both into data/raw/station/
 pdm run gnostiq build  # parse and merge into data/interim/
 ```
@@ -270,42 +272,42 @@ Run this before any modelling. It answers one question: is the Jos record good e
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 python scripts/gate.py              # looks the station up by WMO number
 python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### uv
 
-```bash
+```
 uv run python scripts/gate.py              # looks the station up by WMO number
 uv run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run python scripts/gate.py              # looks the station up by WMO number
 poetry run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run python scripts/gate.py              # looks the station up by WMO number
 pipenv run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run python scripts/gate.py              # looks the station up by WMO number
 hatch run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### PDM
 
-```bash
+```
 pdm run python scripts/gate.py              # looks the station up by WMO number
 pdm run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
@@ -336,42 +338,42 @@ Past forecasts for the Jos grid cell, from Open-Meteo's Previous Runs API. For e
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq pull --only nwp
 gnostiq build
 ```
 
 ### uv
 
-```bash
+```
 uv run gnostiq pull --only nwp
 uv run gnostiq build
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run gnostiq pull --only nwp
 poetry run gnostiq build
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run gnostiq pull --only nwp
 pipenv run gnostiq build
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run gnostiq pull --only nwp
 hatch run gnostiq build
 ```
 
 ### PDM
 
-```bash
+```
 pdm run gnostiq pull --only nwp
 pdm run gnostiq build
 ```
@@ -429,37 +431,37 @@ When the station gauge is not usable, daily rain truth comes from CHIRPS v3. The
 
 #### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq pull --only precip
 ```
 
 #### uv
 
-```bash
+```
 uv run gnostiq pull --only precip
 ```
 
 #### Poetry
 
-```bash
+```
 poetry run gnostiq pull --only precip
 ```
 
 #### Pipenv
 
-```bash
+```
 pipenv run gnostiq pull --only precip
 ```
 
 #### Hatch
 
-```bash
+```
 hatch run gnostiq pull --only precip
 ```
 
 #### PDM
 
-```bash
+```
 pdm run gnostiq pull --only precip
 ```
 
@@ -479,37 +481,37 @@ CHIRPS daily totals are treated as running 00 to 00 UTC. That is an assumption t
 
 #### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq pull --only static
 ```
 
 #### uv
 
-```bash
+```
 uv run gnostiq pull --only static
 ```
 
 #### Poetry
 
-```bash
+```
 poetry run gnostiq pull --only static
 ```
 
 #### Pipenv
 
-```bash
+```
 pipenv run gnostiq pull --only static
 ```
 
 #### Hatch
 
-```bash
+```
 hatch run gnostiq pull --only static
 ```
 
 #### PDM
 
-```bash
+```
 pdm run gnostiq pull --only static
 ```
 
@@ -530,37 +532,37 @@ Station reports are checked before anything is trained or scored against them. A
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq build
 ```
 
 ### uv
 
-```bash
+```
 uv run gnostiq build
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run gnostiq build
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run gnostiq build
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run gnostiq build
 ```
 
 ### PDM
 
-```bash
+```
 pdm run gnostiq build
 ```
 
@@ -596,3 +598,63 @@ Rain days start at 06 UTC when the truth is the station gauge, because that is h
 A pair where the observation and the terrain-corrected forecast differ by more than 15 degC is dropped. At that size one of the two is broken, and there is no way to tell which from here.
 
 If either table ends up with no training rows or no test rows, the build stops and says so. That nearly always means the windows in the config do not overlap the data that was pulled.
+
+## Baselines
+
+These are the forecasts the model has to beat. They are built before the model exists, so the bar is fixed first.
+
+### Standard Python (`venv` / `virtualenv`)
+
+```
+gnostiq baselines
+```
+
+### uv
+
+```
+uv run gnostiq baselines
+```
+
+### Poetry
+
+```
+poetry run gnostiq baselines
+```
+
+### Pipenv
+
+```
+pipenv run gnostiq baselines
+```
+
+### Hatch
+
+```
+hatch run gnostiq baselines
+```
+
+### PDM
+
+```
+pdm run gnostiq baselines
+```
+
+| System | Temperature and dewpoint | Rain |
+|---|---|---|
+| `clim` | Harmonic fit to the station record: annual cycle, daily cycle and their interaction | What fell within 15 days of that calendar date in earlier years |
+| `persist` | The observation one lead time earlier | The last complete day's total at the time the forecast was issued |
+| `raw` | The model's grid-cell value | The model's 24 h total |
+| `lapse` | `raw` moved to station height | not applicable |
+| `emos` | Gaussian regression on the terrain-corrected forecast, fitted by minimum CRPS, one fit per lead day | Logistic regression for wet or dry, gamma regression for the amount |
+| `raw:<model>` | Each extra model, raw | Same |
+
+`emos` is the one that counts. Beating a raw model that sits 113 m too low proves very little. A method that cannot beat a standard statistical correction has not earned its complexity.
+
+Climatology is fitted only on observations before the test window. Persistence only uses observations that existed when the forecast was issued. Both are tested.
+
+Outputs, both under `data/processed/`:
+
+- `pred_hourly_base.parquet`: `valid`, `lead_day`, `split`, `var`, `obs`, `system`, `mu`, `sigma`. `sigma` is empty for systems that give a single value.
+- `pred_daily_base.parquet`: `day`, `lead_day`, `split`, `obs`, `system`, `p1` and `p10` (chance of at least the wet and heavy thresholds), and 99 quantiles `q01` to `q99`.
+
+`dist.py` has the scoring maths these share with the scorecard: CRPS for a normal distribution, CRPS from quantiles, and the rain distribution, which is a point mass at zero plus a gamma above the wet threshold.
