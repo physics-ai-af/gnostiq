@@ -11,44 +11,44 @@ Use the block for your tool.
 ### Standard Python (`venv` / `virtualenv`)
 
 ```
-pytest                       # everything
-python -m pytest             # everything, explicit interpreter
-pytest tests/test_static.py  # one file
+pytest                   # everything
+python -m pytest         # everything, explicit interpreter
+pytest tests/test_qc.py  # one file
 ```
 
 ### uv
 
 ```
-uv run pytest                       # everything
-uv run pytest tests/test_static.py  # one file
+uv run pytest                   # everything
+uv run pytest tests/test_qc.py  # one file
 ```
 
 ### Poetry
 
 ```
-poetry run pytest                       # everything
-poetry run pytest tests/test_static.py  # one file
+poetry run pytest                   # everything
+poetry run pytest tests/test_qc.py  # one file
 ```
 
 ### Pipenv
 
 ```
-pipenv run pytest                       # everything
-pipenv run pytest tests/test_static.py  # one file
+pipenv run pytest                   # everything
+pipenv run pytest tests/test_qc.py  # one file
 ```
 
 ### Hatch
 
 ```
-hatch run pytest                       # everything
-hatch run pytest tests/test_static.py  # one file
+hatch run pytest                   # everything
+hatch run pytest tests/test_qc.py  # one file
 ```
 
 ### PDM
 
 ```
-pdm run pytest                       # everything
-pdm run pytest tests/test_static.py  # one file
+pdm run pytest                   # everything
+pdm run pytest tests/test_qc.py  # one file
 ```
 
 No test touches the network. Downloads are replaced with stand-ins, and anything that needs data uses synthetic files written in the real formats.
@@ -67,6 +67,7 @@ No test touches the network. Downloads are replaced with stand-ins, and anything
 | `tests/test_physics.py` | Formulas against known values, the terrain prior, wind sign, rain-day boundaries, fallbacks |
 | `tests/test_precip.py` | File paths, pixel reads, nodata, incremental pulls, preliminary to final, refused days |
 | `tests/test_static.py` | Terrain tile naming, model height from pressure, caching, the fallback order |
+| `tests/test_qc.py` | Each check on cases it must catch and cases it must leave alone; the full run |
 
 ## Setup
 
@@ -521,3 +522,59 @@ writes `data/processed/static.json`:
 | `z_dem_point`, `z_dem_9km` | Copernicus 30 m terrain at the station, and averaged over about 9 km |
 
 The correction for terrain is driven by station height minus model height. `static.z_model()` prefers the pressure-derived figure, then the API's. If neither is on file it falls back to the station height, which switches the correction off and logs a warning. A failed terrain download does not stop the pull; the DEM figures are for the gate and for your own checking, not for the model.
+
+## Quality control
+
+Station reports are checked before anything is trained or scored against them. A value that fails a check is removed. Nothing is repaired or interpolated.
+
+### Standard Python (`venv` / `virtualenv`)
+
+```
+gnostiq build
+```
+
+### uv
+
+```
+uv run gnostiq build
+```
+
+### Poetry
+
+```
+poetry run gnostiq build
+```
+
+### Pipenv
+
+```
+pipenv run gnostiq build
+```
+
+### Hatch
+
+```
+hatch run gnostiq build
+```
+
+### PDM
+
+```
+pdm run gnostiq build
+```
+
+now also writes `data/interim/obs.parquet` (`valid`, `t`, `td`, `src`) and a tally in `data/reports/qc.md`.
+
+| Check | Rule |
+|---|---|
+| Range | Temperature within -10 to 50 degC, dewpoint within -40 to 35 degC |
+| Dewpoint above temperature | Up to 0.5 degC over is rounding and is set equal to temperature. More than that is a bad report and the dewpoint is dropped. |
+| Spike | More than 8 degC away from both neighbours, in the same direction, with both neighbours within 3 hours |
+| Flatline | 12 or more identical readings in a row spanning at least 24 hours |
+| Climatological outlier | Further from the median for that month and hour than the larger of 8 degC and six robust standard deviations, where there are at least 10 readings to judge by |
+
+A dewpoint with no temperature beside it is dropped too, since it cannot be checked.
+
+The rules are deliberately loose. A real cold front is a large jump that persists, so it is not a spike. Whole-degree METAR temperatures repeat for hours on a calm night, so a short run of identical values is not a flatline. Both cases have tests.
+
+Read `data/reports/qc.md` after the first real build. A check that removes hundreds of values is telling you something about the station or about the check.

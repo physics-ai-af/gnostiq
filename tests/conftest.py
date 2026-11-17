@@ -58,3 +58,12 @@ def raw(tmp_path_factory):
     c = cfg.load(write_cfg(tmp_path_factory.mktemp("run"), SMALL))
     synth.make(c, SYNTH_END, bare=True)
     return c
+
+
+@pytest.fixture(scope="session")
+def built(raw):
+    from gnostiq.ingest import nwp, station
+
+    station.build(raw)
+    nwp.build(raw)
+    return raw
