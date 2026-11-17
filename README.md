@@ -13,42 +13,42 @@ Use the block for your tool.
 ```bash
 pytest                      # everything
 python -m pytest            # everything, explicit interpreter
-pytest tests/test_model.py  # one file
+pytest tests/test_train.py  # one file
 ```
 
 ### uv
 
 ```bash
 uv run pytest                      # everything
-uv run pytest tests/test_model.py  # one file
+uv run pytest tests/test_train.py  # one file
 ```
 
 ### Poetry
 
 ```bash
 poetry run pytest                      # everything
-poetry run pytest tests/test_model.py  # one file
+poetry run pytest tests/test_train.py  # one file
 ```
 
 ### Pipenv
 
 ```bash
 pipenv run pytest                      # everything
-pipenv run pytest tests/test_model.py  # one file
+pipenv run pytest tests/test_train.py  # one file
 ```
 
 ### Hatch
 
 ```bash
 hatch run pytest                      # everything
-hatch run pytest tests/test_model.py  # one file
+hatch run pytest tests/test_train.py  # one file
 ```
 
 ### PDM
 
 ```bash
 pdm run pytest                      # everything
-pdm run pytest tests/test_model.py  # one file
+pdm run pytest tests/test_train.py  # one file
 ```
 
 No test touches the network. Downloads are replaced with stand-ins, and anything that needs data uses synthetic files written in the real formats.
@@ -73,6 +73,7 @@ No test touches the network. Downloads are replaced with stand-ins, and anything
 | `tests/test_baselines.py` | Each baseline recovers a known signal; no test-window leakage; persistence timing |
 | `tests/test_verify.py` | Threat score, bootstrap, reliability bins, common cases, a baseline-only scorecard |
 | `tests/test_model.py` | The untrained net returns the prior; constraints hold for random weights; losses; round trip |
+| `tests/test_train.py` | Whole-week validation split, early stopping, bundle contents, constraints, the scored model |
 
 ## Setup
 
@@ -754,3 +755,59 @@ PDM needs both settings. With `include_packages` alone it also looks up every ot
 Poetry, Pipenv and PDM send torch to the PyTorch index on macOS as well. uv uses PyPI on macOS, where the standard build has no CUDA in it anyway.
 
 Use the requirements files with pip only. uv takes a package from the first index that has it, and the PyTorch index carries its own copies of numpy and other packages, so `uv pip install -r requirements.txt` can fail on a pin. With uv, use `uv sync`.
+
+## Training
+
+### Standard Python (`venv` / `virtualenv`)
+
+```bash
+gnostiq train  # or: gnostiq all
+```
+
+### uv
+
+```bash
+uv run gnostiq train  # or: gnostiq all
+```
+
+### Poetry
+
+```bash
+poetry run gnostiq train  # or: gnostiq all
+```
+
+### Pipenv
+
+```bash
+pipenv run gnostiq train  # or: gnostiq all
+```
+
+### Hatch
+
+```bash
+hatch run gnostiq train  # or: gnostiq all
+```
+
+### PDM
+
+```bash
+pdm run gnostiq train  # or: gnostiq all
+```
+
+fits both networks on the training window and writes:
+
+- `data/models/hourly.pt` and `data/models/daily.pt`
+- `data/processed/pred_hourly_model.parquet` and `pred_daily_model.parquet`, in the same layout as the baseline predictions, with `system = "gnostiq"`
+
+After this, `gnostiq verify` puts the model on the scorecard next to the baselines. `gnostiq all` now runs build, baselines, train, verify.
+
+How it trains:
+
+- Every fifth calendar week of the training window is held out for early stopping. Whole weeks, because neighbouring hours are nearly copies of each other and a random split would leak.
+- Adam, batches of 512. Training stops when the held-out loss has not improved for `model.patience` epochs, and the best weights are kept.
+- `model.seeds` networks are trained from different starting points and averaged.
+- The test window is never touched.
+
+Each bundle records `cols`: the forecast inputs that actually had data during training. The live forecast uses that list to blank out anything the model never saw.
+
+On a laptop CPU the default settings take a few minutes.

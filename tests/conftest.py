@@ -84,3 +84,11 @@ def based(pairs):
 
     baselines.run(pairs)
     return pairs
+
+
+@pytest.fixture(scope="session")
+def trained(based):
+    from gnostiq import train
+
+    train.run(based)
+    return based
