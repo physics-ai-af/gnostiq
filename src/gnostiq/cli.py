@@ -24,12 +24,13 @@ def pull(c, a):
 
 
 def build(c, a):
-    from gnostiq import qc
+    from gnostiq import align, qc
     from gnostiq.ingest import nwp, station
 
     station.build(c)
     nwp.build(c)
     qc.run(c)
+    align.build(c)
 
 
 def main(argv=None):
