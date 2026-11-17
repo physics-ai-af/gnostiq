@@ -5,9 +5,15 @@ description = "Physics-constrained post-processing of global NWP for Jos, Nigeri
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "numpy>=2.1",
+    "pandas>=2.2",
+    "pyarrow>=18",
     "requests>=2.32",
     "tzdata; sys_platform == 'win32'",
 ]
+
+[project.scripts]
+gnostiq = "gnostiq.cli:main"
 
 [dependency-groups]
 dev = [
