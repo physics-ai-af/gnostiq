@@ -2,4 +2,4 @@ numpy==2.5.5
 pandas==3.1.1
 pyarrow==26.0.1
 requests==2.34.2
-tzdata==2026.6 
+tzdata==2026.6; sys_platform == "win32"
