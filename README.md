@@ -10,45 +10,45 @@ Use the block for your tool.
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
-pytest                    # everything
-python -m pytest          # everything, explicit interpreter
-pytest tests/test_api.py  # one file
+```
+pytest                         # everything
+python -m pytest               # everything, explicit interpreter
+pytest tests/test_pipeline.py  # one file
 ```
 
 ### uv
 
-```bash
-uv run pytest                    # everything
-uv run pytest tests/test_api.py  # one file
+```
+uv run pytest                         # everything
+uv run pytest tests/test_pipeline.py  # one file
 ```
 
 ### Poetry
 
-```bash
-poetry run pytest                    # everything
-poetry run pytest tests/test_api.py  # one file
+```
+poetry run pytest                         # everything
+poetry run pytest tests/test_pipeline.py  # one file
 ```
 
 ### Pipenv
 
-```bash
-pipenv run pytest                    # everything
-pipenv run pytest tests/test_api.py  # one file
+```
+pipenv run pytest                         # everything
+pipenv run pytest tests/test_pipeline.py  # one file
 ```
 
 ### Hatch
 
-```bash
-hatch run pytest                    # everything
-hatch run pytest tests/test_api.py  # one file
+```
+hatch run pytest                         # everything
+hatch run pytest tests/test_pipeline.py  # one file
 ```
 
 ### PDM
 
-```bash
-pdm run pytest                    # everything
-pdm run pytest tests/test_api.py  # one file
+```
+pdm run pytest                         # everything
+pdm run pytest tests/test_pipeline.py  # one file
 ```
 
 No test touches the network. Downloads are replaced with stand-ins, and anything that needs data uses synthetic files written in the real formats.
@@ -77,6 +77,7 @@ No test touches the network. Downloads are replaced with stand-ins, and anything
 | `tests/test_cases.py` | Case selection, ordering, completeness, and the saved file |
 | `tests/test_run.py` | Lead-day rounding, coverage, physical consistency, input masking, atomic write |
 | `tests/test_api.py` | 404 before reports exist, reports served as written, the page, the method note |
+| `tests/test_pipeline.py` | The whole pipeline through the CLI, then the live run and the API |
 
 ## Setup
 
@@ -84,7 +85,7 @@ You need Python 3.12 or newer. There are no API keys and no accounts. Each block
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 python -m venv .venv                   # or: virtualenv .venv
 source .venv/bin/activate              # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
@@ -104,7 +105,7 @@ The requirements files list direct dependencies only, so pip still picks version
 
 ### uv
 
-```bash
+```
 uv sync
 uv run pytest
 uv run ruff check . && uv run ruff format --check .
@@ -114,7 +115,7 @@ uv run ruff check . && uv run ruff format --check .
 
 ### Poetry
 
-```bash
+```
 poetry install
 poetry run pytest
 poetry run ruff check . && poetry run ruff format --check .
@@ -124,7 +125,7 @@ Poetry reads the standard `[project]` and `[dependency-groups]` tables, so there
 
 ### Pipenv
 
-```bash
+```
 pipenv install --dev
 pipenv run pytest
 pipenv run ruff check . && pipenv run ruff format --check .
@@ -134,7 +135,7 @@ Pipenv does not read `pyproject.toml`. It reads the `Pipfile`, which carries the
 
 ### Hatch
 
-```bash
+```
 hatch env create
 hatch run pytest
 hatch run ruff check . && hatch run ruff format --check .
@@ -144,7 +145,7 @@ hatch run ruff check . && hatch run ruff format --check .
 
 ### PDM
 
-```bash
+```
 pdm install
 pdm run pytest
 pdm run ruff check . && pdm run ruff format --check .
@@ -209,42 +210,42 @@ Run the ingestion with the block for your tool:
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq pull   # download both into data/raw/station/
 gnostiq build  # parse and merge into data/interim/
 ```
 
 ### uv
 
-```bash
+```
 uv run gnostiq pull   # download both into data/raw/station/
 uv run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run gnostiq pull   # download both into data/raw/station/
 poetry run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run gnostiq pull   # download both into data/raw/station/
 pipenv run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run gnostiq pull   # download both into data/raw/station/
 hatch run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### PDM
 
-```bash
+```
 pdm run gnostiq pull   # download both into data/raw/station/
 pdm run gnostiq build  # parse and merge into data/interim/
 ```
@@ -278,42 +279,42 @@ Run this before any modelling. It answers one question: is the Jos record good e
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 python scripts/gate.py              # looks the station up by WMO number
 python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### uv
 
-```bash
+```
 uv run python scripts/gate.py              # looks the station up by WMO number
 uv run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run python scripts/gate.py              # looks the station up by WMO number
 poetry run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run python scripts/gate.py              # looks the station up by WMO number
 pipenv run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run python scripts/gate.py              # looks the station up by WMO number
 hatch run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### PDM
 
-```bash
+```
 pdm run python scripts/gate.py              # looks the station up by WMO number
 pdm run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
@@ -344,42 +345,42 @@ Past forecasts for the Jos grid cell, from Open-Meteo's Previous Runs API. For e
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq pull --only nwp
 gnostiq build
 ```
 
 ### uv
 
-```bash
+```
 uv run gnostiq pull --only nwp
 uv run gnostiq build
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run gnostiq pull --only nwp
 poetry run gnostiq build
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run gnostiq pull --only nwp
 pipenv run gnostiq build
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run gnostiq pull --only nwp
 hatch run gnostiq build
 ```
 
 ### PDM
 
-```bash
+```
 pdm run gnostiq pull --only nwp
 pdm run gnostiq build
 ```
@@ -437,37 +438,37 @@ When the station gauge is not usable, daily rain truth comes from CHIRPS v3. The
 
 #### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq pull --only precip
 ```
 
 #### uv
 
-```bash
+```
 uv run gnostiq pull --only precip
 ```
 
 #### Poetry
 
-```bash
+```
 poetry run gnostiq pull --only precip
 ```
 
 #### Pipenv
 
-```bash
+```
 pipenv run gnostiq pull --only precip
 ```
 
 #### Hatch
 
-```bash
+```
 hatch run gnostiq pull --only precip
 ```
 
 #### PDM
 
-```bash
+```
 pdm run gnostiq pull --only precip
 ```
 
@@ -487,37 +488,37 @@ CHIRPS daily totals are treated as running 00 to 00 UTC. That is an assumption t
 
 #### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq pull --only static
 ```
 
 #### uv
 
-```bash
+```
 uv run gnostiq pull --only static
 ```
 
 #### Poetry
 
-```bash
+```
 poetry run gnostiq pull --only static
 ```
 
 #### Pipenv
 
-```bash
+```
 pipenv run gnostiq pull --only static
 ```
 
 #### Hatch
 
-```bash
+```
 hatch run gnostiq pull --only static
 ```
 
 #### PDM
 
-```bash
+```
 pdm run gnostiq pull --only static
 ```
 
@@ -538,37 +539,37 @@ Station reports are checked before anything is trained or scored against them. A
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq build
 ```
 
 ### uv
 
-```bash
+```
 uv run gnostiq build
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run gnostiq build
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run gnostiq build
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run gnostiq build
 ```
 
 ### PDM
 
-```bash
+```
 pdm run gnostiq build
 ```
 
@@ -611,37 +612,37 @@ These are the forecasts the model has to beat. They are built before the model e
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq baselines
 ```
 
 ### uv
 
-```bash
+```
 uv run gnostiq baselines
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run gnostiq baselines
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run gnostiq baselines
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run gnostiq baselines
 ```
 
 ### PDM
 
-```bash
+```
 pdm run gnostiq baselines
 ```
 
@@ -669,37 +670,37 @@ Outputs, both under `data/processed/`:
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq verify  # or: gnostiq all
 ```
 
 ### uv
 
-```bash
+```
 uv run gnostiq verify  # or: gnostiq all
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run gnostiq verify  # or: gnostiq all
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run gnostiq verify  # or: gnostiq all
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run gnostiq verify  # or: gnostiq all
 ```
 
 ### PDM
 
-```bash
+```
 pdm run gnostiq verify  # or: gnostiq all
 ```
 
@@ -763,37 +764,37 @@ Use the requirements files with pip only. uv takes a package from the first inde
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq train  # or: gnostiq all
 ```
 
 ### uv
 
-```bash
+```
 uv run gnostiq train  # or: gnostiq all
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run gnostiq train  # or: gnostiq all
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run gnostiq train  # or: gnostiq all
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run gnostiq train  # or: gnostiq all
 ```
 
 ### PDM
 
-```bash
+```
 pdm run gnostiq train  # or: gnostiq all
 ```
 
@@ -819,37 +820,37 @@ On a laptop CPU the default settings take a few minutes.
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq cases  # or: gnostiq all
 ```
 
 ### uv
 
-```bash
+```
 uv run gnostiq cases  # or: gnostiq all
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run gnostiq cases  # or: gnostiq all
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run gnostiq cases  # or: gnostiq all
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run gnostiq cases  # or: gnostiq all
 ```
 
 ### PDM
 
-```bash
+```
 pdm run gnostiq cases  # or: gnostiq all
 ```
 
@@ -865,37 +866,37 @@ A scorecard tells you about the average day. These tell you what the system said
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq run
 ```
 
 ### uv
 
-```bash
+```
 uv run gnostiq run
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run gnostiq run
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run gnostiq run
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run gnostiq run
 ```
 
 ### PDM
 
-```bash
+```
 pdm run gnostiq run
 ```
 
@@ -920,42 +921,42 @@ The file is written to a temporary name and renamed, so the web server never rea
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq serve                             # http://127.0.0.1:8000
 gnostiq serve --host 0.0.0.0 --port 8080
 ```
 
 ### uv
 
-```bash
+```
 uv run gnostiq serve                             # http://127.0.0.1:8000
 uv run gnostiq serve --host 0.0.0.0 --port 8080
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run gnostiq serve                             # http://127.0.0.1:8000
 poetry run gnostiq serve --host 0.0.0.0 --port 8080
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run gnostiq serve                             # http://127.0.0.1:8000
 pipenv run gnostiq serve --host 0.0.0.0 --port 8080
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run gnostiq serve                             # http://127.0.0.1:8000
 hatch run gnostiq serve --host 0.0.0.0 --port 8080
 ```
 
 ### PDM
 
-```bash
+```
 pdm run gnostiq serve                             # http://127.0.0.1:8000
 pdm run gnostiq serve --host 0.0.0.0 --port 8080
 ```
@@ -978,3 +979,176 @@ The page is one HTML file with no build step and no external scripts. It has thr
 - **Heavy-rain cases**: one small chart per replayed day.
 
 Every chart has a Table button with the same numbers, and the page follows the system light or dark setting. The footer carries the attribution Open-Meteo, NOAA, IEM and CHIRPS ask for; keep it if you restyle the page.
+
+## End-to-end test
+
+`tests/test_pipeline.py` drives the whole thing through the command line on synthetic data: `gnostiq all`, then `gnostiq run` with a stand-in for the live forecast, then the API. If a change breaks the wiring between two modules, this is the test that fails.
+
+## Running it for real
+
+After setting up with your tool as described under Setup:
+
+### Standard Python (`venv` / `virtualenv`)
+
+```
+python scripts/gate.py  # then copy the suggested lines into gnostiq.toml
+gnostiq pull            # everything; safe to re-run
+gnostiq all             # build, baselines, train, verify, cases
+gnostiq run             # live forecast
+gnostiq serve           # http://127.0.0.1:8000
+```
+
+### uv
+
+```
+uv run python scripts/gate.py  # then copy the suggested lines into gnostiq.toml
+uv run gnostiq pull            # everything; safe to re-run
+uv run gnostiq all             # build, baselines, train, verify, cases
+uv run gnostiq run             # live forecast
+uv run gnostiq serve           # http://127.0.0.1:8000
+```
+
+### Poetry
+
+```
+poetry run python scripts/gate.py  # then copy the suggested lines into gnostiq.toml
+poetry run gnostiq pull            # everything; safe to re-run
+poetry run gnostiq all             # build, baselines, train, verify, cases
+poetry run gnostiq run             # live forecast
+poetry run gnostiq serve           # http://127.0.0.1:8000
+```
+
+### Pipenv
+
+```
+pipenv run python scripts/gate.py  # then copy the suggested lines into gnostiq.toml
+pipenv run gnostiq pull            # everything; safe to re-run
+pipenv run gnostiq all             # build, baselines, train, verify, cases
+pipenv run gnostiq run             # live forecast
+pipenv run gnostiq serve           # http://127.0.0.1:8000
+```
+
+### Hatch
+
+```
+hatch run python scripts/gate.py  # then copy the suggested lines into gnostiq.toml
+hatch run gnostiq pull            # everything; safe to re-run
+hatch run gnostiq all             # build, baselines, train, verify, cases
+hatch run gnostiq run             # live forecast
+hatch run gnostiq serve           # http://127.0.0.1:8000
+```
+
+### PDM
+
+```
+pdm run python scripts/gate.py  # then copy the suggested lines into gnostiq.toml
+pdm run gnostiq pull            # everything; safe to re-run
+pdm run gnostiq all             # build, baselines, train, verify, cases
+pdm run gnostiq run             # live forecast
+pdm run gnostiq serve           # http://127.0.0.1:8000
+```
+
+Read `data/reports/gate.md` first, then `data/reports/qc.md`, then `data/reports/scorecard.md`.
+
+Method and limits are written up in [docs/METHOD.md](docs/METHOD.md).
+
+## Deploy
+
+Any small Linux server will do: one CPU and 1 GB of memory. Train on your own machine and ship the results. The server only produces the live forecast and serves the page.
+
+On the server:
+
+```
+sudo useradd -r -m -d /opt/gnostiq gnostiq
+sudo -u gnostiq git clone <your-remote> /opt/gnostiq/app
+cd /opt/gnostiq/app && sudo -u gnostiq uv sync --no-dev
+```
+
+Or, without uv on the server:
+
+```
+cd /opt/gnostiq/app
+sudo -u gnostiq python3.12 -m venv .venv
+sudo -u gnostiq .venv/bin/pip install -r requirements.txt
+sudo -u gnostiq .venv/bin/pip install -e . --no-deps
+```
+
+Either way the environment ends up in `/opt/gnostiq/app/.venv`, which is where the systemd units look for the `gnostiq` command.
+
+The other tools work on a server too, as long as the environment lands in `.venv`:
+
+| Tool | Install on the server | Environment in `.venv`? |
+|---|---|---|
+| Poetry | `poetry install --only main` | Only after `poetry config virtualenvs.in-project true` |
+| Pipenv | `pipenv install` | Only with `PIPENV_VENV_IN_PROJECT=1` set |
+| PDM | `pdm install --prod` | Yes, by default |
+| Hatch | `hatch env create` | No. Point `ExecStart` in both units at the path `hatch env find` prints. |
+
+From your machine, copy the trained models, the reports and the terrain file:
+
+```
+rsync -a --relative data/models data/reports data/processed/static.json <server>:/opt/gnostiq/app/
+```
+
+Then install the services from `deploy/`:
+
+```
+sudo cp deploy/gnostiq-api.service deploy/gnostiq-run.service deploy/gnostiq-run.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now gnostiq-api.service gnostiq-run.timer
+sudo systemctl start gnostiq-run.service     # first forecast now, not in three hours
+```
+
+The timer refreshes the forecast every three hours. For HTTPS, install Caddy and put your domain in `deploy/Caddyfile`.
+
+To check it: `curl localhost:8000/api/health` shows when the forecast was issued, and `journalctl -u gnostiq-run` shows the last run.
+
+CI is in `.github/workflows/ci.yml`: lint and tests on every push and pull request. It installs without a lock file, so commit `uv.lock` and change the step to `uv sync --locked` once the stack is merged.
+
+## Keeping it current
+
+- The forecast refreshes itself through the timer.
+- To extend training past the current test window: move the dates in `[window]`, run `gnostiq pull --refresh` then `gnostiq all` (with your tool's `run` prefix), and copy `data/models` and `data/reports` to the server again. Pick the new test window before you look at any scores for it.
+- CHIRPS final data arrives around the third week of the following month. Until then recent days are preliminary, and `pull` replaces them when the final files appear.
+
+## What has been checked, and what has not
+
+The pipeline runs end to end and every test passes, on synthetic data. No real-data result exists. The download code has never been executed against the live servers; on 2026-11-17 the request formats were checked by hand in a browser.
+
+| Source | Checked | Result |
+|---|---|---|
+| Open-Meteo archive, `ecmwf_ifs025`, core variables | Yes | Works. Grid cell centre 9.75 N 9.0 E, height 1182 m. |
+| Same, CAPE and column water vapour | Yes | Served but all null |
+| Same, pressure-level fields | Yes | Refused by the API |
+| `gfs_seamless` | Yes | Works, including CAPE |
+| `icon_seamless` | Yes | Works at short leads; day 7 is null |
+| CHIRPS v3 file paths | Yes | Correct. Final `sat` files through October 2026. One request got a 429. |
+| NOAA GHCNh station list and data file | No | They only download. The parser follows NOAA's documentation. |
+| IEM METAR request | No | Parameters follow IEM's documentation |
+
+## Assumptions to check on real data
+
+1. **GHCNh file layout.** See "Not yet checked against a real file" under Station observations. This is the most likely thing to need a fix on the first run, and the gate exercises it first.
+2. **CHIRPS day boundary.** Daily totals are treated as 00 to 00 UTC. If the product's day is offset, forecast and truth are misaligned by some hours.
+3. **Station identity.** If the gate says the synoptic and METAR temperatures come from a "different site or sensor", `truth.temp = "merged"` mixes two instruments. Use `ghcnh` or `iem` alone.
+4. **Station height.** The terrain correction is station height minus the model's 1182 m. At the listed 1295 m the model is cooled by about 0.7 degC. If the gate's barometer estimate disagrees with 1295 m, fix `site.elev_m` before training.
+5. **Open-Meteo licence.** The free API is non-commercial. A commercial service needs their paid plan or your own ingest of ECMWF open data.
+
+## Known gaps
+
+- **No CAPE, column water vapour or pressure-level inputs.** The lead-time archive does not have them for ECMWF. The rain model's moisture supply is estimated from surface dewpoint, and the terrain correction uses the standard 6.5 K/km. Two ways to close this: use GFS CAPE as an extra predictor, since the archive has it, or pull whole ECMWF runs through Open-Meteo's Single Runs API, which is a bigger ingest job.
+- **One site and one test season.** Nothing here shows the method carries over to other terrain.
+- **The IFS changed cycle on 12 May 2026**, inside the default test window. Training data comes from the earlier cycle.
+
+## Troubleshooting
+
+| Symptom | Cause and fix |
+|---|---|
+| `pull` stops with a 400 on the core group | Open-Meteo rejected a variable or the model id. The message quotes the server's reason. Fix the id in `gnostiq.toml` or the name in `GROUPS` in `ingest/nwp.py`. |
+| Warning `variable group 'levels' not served` | Expected. A `levels.missing` marker stops further attempts; `--refresh` tries again. |
+| 429 or repeated retries | Rate limit. Wait, then re-run; finished downloads are skipped. |
+| `N GHCNh candidates ...` | Several station records match. Run the gate and set `site.ghcnh`. |
+| CHIRPS log says many days not read | Usually the rate limit; re-run. If every read fails, open one URL from `precip.url()` in a browser. |
+| `pairs have no train or no test rows` | The windows do not overlap the data. Check the last observation date in `data/reports/gate.md`. |
+| `only N wet training days` | Rain truth is too sparse. Use `truth.rain = "chirps"`. |
+| The page says "Not available yet" | The command it names has not been run, or `data/reports` was not copied to the server. |

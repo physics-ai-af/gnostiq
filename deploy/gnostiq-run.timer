@@ -1,0 +1,10 @@
+[Unit]
+Description=Refresh the Gnostiq forecast every 3 hours
+
+[Timer]
+OnCalendar=*-*-* 00/3:20:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
