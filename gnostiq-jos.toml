@@ -1,0 +1,46 @@
+# station fields are provisional until scripts/gate.py has run
+
+[site]
+name = "jos"
+wmo = "65134"
+icao = "DNJO"
+ghcnh = ""                    # empty = look up by WMO number
+lat = 9.8667
+lon = 8.9000
+elev_m = 1295.0
+tz = "Africa/Lagos"
+bbox = [9.4, 10.1, 8.6, 9.2]  # lat0, lat1, lon0, lon1
+
+[window]
+start = 2021-01-01
+train_end = 2026-03-31
+test_start = 2026-04-01
+test_end = 2026-10-31
+wet_months = [4, 5, 6, 7, 8, 9, 10]
+
+# set from the gate report
+[truth]
+temp = "merged"               # ghcnh | iem | merged
+rain = "chirps"               # station | chirps
+chirps_flavor = "sat"         # sat | rnl
+
+[nwp]
+base = "ecmwf_ifs025"
+extra = ["gfs_seamless", "icon_seamless"]  # scored raw only
+start = 2024-01-01            # archive starts Jan 2024
+chunk_days = 92
+
+[forecast]
+lead_days = [1, 2, 3, 4, 5, 6, 7]
+wet_mm = 1.0
+heavy_mm = 10.0
+
+[model]
+seeds = 3
+hidden = 64
+max_epochs = 300
+patience = 25
+eff_max = 2.0                 # cap on rain / precipitable water
+
+[paths]
+data = "data"

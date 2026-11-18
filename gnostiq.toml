@@ -1,15 +1,15 @@
 # station fields are provisional until scripts/gate.py has run
 
 [site]
-name = "jos"
-wmo = "65134"
-icao = "DNJO"
+name = "abuja"
+wmo = "65125"
+icao = "DNAA"
 ghcnh = ""                    # empty = look up by WMO number
-lat = 9.8667
-lon = 8.9000
-elev_m = 1295.0
+lat = 9.0068
+lon = 7.2632
+elev_m = 342.0
 tz = "Africa/Lagos"
-bbox = [9.4, 10.1, 8.6, 9.2]  # lat0, lat1, lon0, lon1
+bbox = [8.8, 9.2, 7.0, 7.5]   # lat0, lat1, lon0, lon1
 
 [window]
 start = 2021-01-01
@@ -43,4 +43,4 @@ patience = 25
 eff_max = 2.0                 # cap on rain / precipitable water
 
 [paths]
-data = "data"
+data = "data/abuja"           # caches are not split by site
