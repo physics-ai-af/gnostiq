@@ -63,6 +63,7 @@ def forecast(c, frame, init, extras=None):
         step = {
             "valid_utc": v.strftime("%Y-%m-%dT%H:%MZ"), "lead_day": int(ld), "t2m": q(t, i), "td2m": q(td, i),
             "raw": {"t2m": round(float(fut.f_t2m[i]), 1), "td2m": round(float(fut.f_td2m[i]), 1)},
+            "lapse": {"t2m": value(fut.t_prior[i]), "td2m": value(fut.td_prior[i])},
             "models": {m: {"t2m": value(fut.f_t2m[i] + fut[f"x_{m}_dt2m"][i]),
                            "td2m": value(fut.f_td2m[i] + fut[f"x_{m}_dtd2m"][i])} for m in others},
         }  # fmt: skip
@@ -95,6 +96,7 @@ def forecast(c, frame, init, extras=None):
         "init_utc": init.strftime("%Y-%m-%dT%H:%MZ"),
         "base_model": c.nwp.base,
         "model_trained": hb["trained"],
+        "trained_at": c.donor or c.site.name,
         "thresholds": {"wet_mm": c.wet_mm, "heavy_mm": c.heavy_mm},
         "hourly": hourly,
         "daily": daily,
@@ -108,7 +110,7 @@ def issued(doc):
     for s in doc["hourly"]:
         valid = pd.Timestamp(s["valid_utc"].rstrip("Z"))
         for var in ("t2m", "td2m"):
-            got = [("gnostiq", s[var]), ("raw", s["raw"][var])]
+            got = [("gnostiq", s[var]), ("raw", s["raw"][var]), ("lapse", s["lapse"][var])]
             got += [(f"raw:{m}", x[var]) for m, x in s["models"].items()]
             if "clim" in s:
                 got.append(("clim", s["clim"][var]))
@@ -123,6 +125,8 @@ def issued(doc):
 
 
 def run(c):
+    # cached after the first call; without it the terrain correction is silently off
+    static.pull(c)
     frame, _ = nwp.live(c)
     init = pd.Timestamp.now("UTC").tz_localize(None).floor("h")
     doc = forecast(c, frame, init, nwp.live_extra(c))

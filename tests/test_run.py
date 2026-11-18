@@ -1,11 +1,14 @@
 import json
+import shutil
 
 import numpy as np
 import pandas as pd
+import pytest
 import synth
+from conftest import LIVE, write_nearby
 
-from gnostiq import model, run
-from gnostiq.ingest import nwp
+from gnostiq import cfg, cli, model, run
+from gnostiq.ingest import nwp, static
 
 INIT = pd.Timestamp("2025-07-14 09:00")
 
@@ -81,8 +84,8 @@ def test_issued_rows_are_what_the_page_shows(trained):
     doc = run.forecast(c, synth.live_frame(c, INIT), INIT, live_extras(c, INIT))
     t = run.issued(doc)
     m = c.nwp.extra[0]
-    assert set(t.system) == {"gnostiq", "raw", f"raw:{m}", "clim"} and set(t["var"]) == {"t2m", "td2m"}
-    assert len(t) == 2 * 4 * len(doc["hourly"]) and (t.init == INIT).all()
+    assert set(t.system) == {"gnostiq", "raw", "lapse", f"raw:{m}", "clim"} and set(t["var"]) == {"t2m", "td2m"}
+    assert len(t) == 2 * 5 * len(doc["hourly"]) and (t.init == INIT).all()
     first = doc["hourly"][0]
     g = t[(t.system == "gnostiq") & (t["var"] == "t2m")].iloc[0]
     assert g.mu == first["t2m"]["q50"] and g.sigma > 0
@@ -97,3 +100,59 @@ def test_extra_models_feed_the_forecast_and_a_missing_one_is_survivable(trained)
         doc = run.forecast(c, frame, INIT, extras)
         assert len(doc["hourly"]) == 24 * max(c.lead_days)
         assert all(x["td2m"]["q50"] <= x["t2m"]["q50"] for x in doc["hourly"])
+
+
+@pytest.fixture
+def nearby(trained):
+    # a second site beside the trained one, with its own terrain height and no record
+    c = cfg.load(write_nearby(trained.source.parent))
+    c.paths.ensure()
+    shutil.copy(trained.paths.processed / "static.json", c.paths.processed / "static.json")
+    yield c
+    shutil.rmtree(c.paths.data)
+    (trained.source.parent / "gnostiq-nearby.toml").unlink()
+
+
+def test_a_borrowing_site_runs_the_donor_networks_at_its_own_height(trained, nearby):
+    home = run.forecast(trained, synth.live_frame(trained, INIT), INIT)
+    doc = run.forecast(nearby, synth.live_frame(nearby, INIT), INIT)
+    assert home["trained_at"] == "jos" and doc["trained_at"] == "jos" and doc["site"]["name"] == "nearby"
+    assert len(doc["hourly"]) == len(home["hourly"]) and "clim" not in doc["hourly"][0]
+    # same model input at a site 105 m higher: the height correction cools it
+    assert doc["hourly"][0]["lapse"]["t2m"] < home["hourly"][0]["lapse"]["t2m"]
+    assert all(x["lapse"]["td2m"] <= x["lapse"]["t2m"] for x in doc["hourly"])
+
+
+def test_run_fetches_the_terrain_height_first(nearby, monkeypatch):
+    def boom(c, refresh=False):
+        raise LookupError(c.site.name)
+
+    monkeypatch.setattr(static, "pull", boom)
+    with pytest.raises(LookupError, match="nearby"):
+        run.run(nearby)
+
+
+def test_run_all_sites_keeps_going_past_a_failure(trained, nearby, monkeypatch):
+    seen = []
+
+    def fake(c):
+        seen.append(c.site.name)
+        if c.site.name == "jos":
+            raise RuntimeError("down")
+
+    monkeypatch.setattr(run, "run", fake)
+    with pytest.raises(SystemExit, match="run failed for jos"):
+        cli.main(["--config", str(trained.source), "run", "--all-sites"])
+    assert seen == ["jos", "nearby"]
+
+
+def test_pull_on_a_borrowing_site_fetches_only_its_terrain(nearby, monkeypatch):
+    seen = []
+    monkeypatch.setattr(static, "pull", lambda c, refresh=False: seen.append(c.site.name))
+    cli.main(["--config", str(nearby.source), "pull"])
+    assert seen == ["nearby"]
+
+
+def test_the_repo_jos_config_borrows_abuja():
+    j = cfg.load(LIVE.parent / "gnostiq-jos.toml")
+    assert j.donor == "abuja" and j.paths.data != cfg.load(LIVE).paths.data

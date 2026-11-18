@@ -3,7 +3,7 @@ import json
 import pandas as pd
 import pytest
 import synth
-from conftest import SMALL, SYNTH_END, write_cfg
+from conftest import SMALL, SYNTH_END, write_cfg, write_nearby
 from fastapi.testclient import TestClient
 
 from gnostiq import api, cfg, cli, verify
@@ -77,3 +77,24 @@ def test_live_forecast_reaches_the_page(repo):
     assert len(doc["hourly"]) == 24 * max(c.lead_days) and len(doc["daily"]) >= max(c.lead_days) - 1
     assert all(x["td2m"]["q50"] <= x["t2m"]["q50"] for x in doc["hourly"])
     assert [k["date"] for k in client.get("/api/cases").json()["cases"]]
+
+
+def test_a_second_site_runs_on_the_first_sites_networks(repo):
+    c, mp = repo
+    path = write_nearby(c.source.parent)
+    init = pd.Timestamp.now("UTC").tz_localize(None).floor("h")
+    mp.setattr(nwp, "live", lambda c, days=9: (synth.live_frame(c, init), 1182.0))
+    mp.setattr(nwp, "live_extra", lambda c, days=9: {})
+    near = cfg.load(path)
+    near.paths.ensure()
+    (near.paths.processed / "static.json").write_text((c.paths.processed / "static.json").read_text())
+    with pytest.raises(SystemExit, match="no record of its own"):
+        cli.main(["--config", str(path), "train"])
+    cli.main(["run", "--all-sites"])
+
+    client = TestClient(api.create(c))
+    assert [s["name"] for s in client.get("/api/sites").json()] == [c.site.name, "nearby"]
+    doc = client.get("/api/nearby/forecast").json()
+    assert doc["trained_at"] == c.site.name and doc["site"]["name"] == "nearby" and doc["hourly"]
+    assert client.get("/api/nearby/verify").status_code == 404
+    assert list(near.paths.archive.glob("*.parquet")) and not (near.paths.data / "models").exists()

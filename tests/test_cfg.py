@@ -1,5 +1,5 @@
 import pytest
-from conftest import DEFAULT, LIVE, write_cfg
+from conftest import DEFAULT, LIVE, NEARBY, write_cfg, write_nearby
 
 from gnostiq import cfg
 
@@ -11,8 +11,9 @@ def test_default_loads():
     assert c.truth.rain_h0 == 0
 
 
-def test_the_repo_config_is_valid():
-    cfg.load(LIVE)
+def test_the_repo_configs_are_valid():
+    sites = cfg.sites(cfg.load(LIVE))
+    assert len({x.site.name for x in sites}) == len(sites)
 
 
 @pytest.mark.parametrize(
@@ -35,6 +36,7 @@ def test_the_repo_config_is_valid():
         ("heavy_mm = 10.0", "heavy_mm = 0.5", "thresholds"),
         ("seeds = 3", "seeds = 0", "model settings"),
         ('icao = "DNJO"\n', "", "missing site.icao"),
+        ('name = "jos"', 'name = "Jos Plateau"', "site.name"),
     ],
 )
 def test_rejects(tmp_path, old, new, msg):
@@ -69,3 +71,52 @@ def test_env_override(tmp_path, monkeypatch):
         assert cfg.get().site.name == "jos-alt"
     finally:
         cfg.get.cache_clear()
+
+
+def test_a_borrowing_site_takes_everything_but_site_and_paths_from_its_donor(tmp_path):
+    donor = cfg.load(write_cfg(tmp_path))
+    c = cfg.load(write_nearby(tmp_path))
+    assert c.donor == "jos" and c.site.name == "nearby" and c.site.elev == 1400.0
+    assert c.paths.models == donor.paths.models and c.paths.reports == tmp_path / "nearby" / "reports"
+    assert (c.window, c.truth, c.nwp, c.lead_days, c.model) == (donor.window, donor.truth, donor.nwp, donor.lead_days,
+                                                                donor.model)  # fmt: skip
+    assert donor.donor == "" and donor.paths.models == tmp_path / "data" / "models"
+
+
+@pytest.mark.parametrize(
+    "edit, msg",
+    [
+        ({"[paths]": "[window]\nstart = 2021-01-01\n\n[paths]"}, "set only"),
+        ({'from = "gnostiq.toml"': 'from = "gnostiq.toml"\nseeds = 1'}, "model.seeds"),
+        ({'data = "nearby"': 'data = "data"'}, "data directory"),
+        ({'name = "nearby"': 'name = "jos"'}, "same site name"),
+        ({"lat = 9.64": "lat = 12.0"}, "outside bbox"),
+    ],
+)
+def test_a_borrowing_site_is_checked(tmp_path, edit, msg):
+    write_cfg(tmp_path)
+    text = NEARBY
+    for old, new in edit.items():
+        text = text.replace(old, new)
+    with pytest.raises(ValueError, match=msg):
+        cfg.load(write_nearby(tmp_path, text))
+
+
+def test_borrowing_does_not_chain(tmp_path):
+    write_cfg(tmp_path)
+    write_nearby(tmp_path)
+    p = tmp_path / "gnostiq-third.toml"
+    p.write_text(NEARBY.replace('"nearby"', '"third"').replace("gnostiq.toml", "gnostiq-nearby.toml"))
+    with pytest.raises(ValueError, match="borrows its networks too"):
+        cfg.load(p)
+
+
+def test_sites_are_found_beside_the_config(tmp_path):
+    c = cfg.load(write_cfg(tmp_path))
+    assert [x.site.name for x in cfg.sites(c)] == ["jos"]
+    near = cfg.load(write_nearby(tmp_path))
+    assert [x.site.name for x in cfg.sites(c)] == ["jos", "nearby"]
+    assert [x.site.name for x in cfg.sites(near)] == ["nearby", "jos"]
+    (tmp_path / "gnostiq-copy.toml").write_text(NEARBY.replace('data = "nearby"', 'data = "copy"'))
+    with pytest.raises(ValueError, match="more than one config .* for nearby"):
+        cfg.sites(c)

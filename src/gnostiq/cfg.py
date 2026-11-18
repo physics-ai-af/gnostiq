@@ -2,6 +2,7 @@
 
 import functools
 import os
+import re
 import tomllib
 from dataclasses import dataclass
 from datetime import date
@@ -84,6 +85,7 @@ class Model:
 @dataclass(frozen=True)
 class Paths:
     data: Path
+    borrowed: Path | None = None
 
     @property
     def raw(self):
@@ -99,7 +101,7 @@ class Paths:
 
     @property
     def models(self):
-        return self.data / "models"
+        return self.borrowed or self.data / "models"
 
     @property
     def reports(self):
@@ -126,6 +128,7 @@ class Cfg:
     model: Model
     paths: Paths
     source: Path
+    donor: str = ""  # site whose networks this one runs; empty means its own
 
 
 def find():
@@ -139,10 +142,31 @@ def find():
     raise FileNotFoundError(f"{FILENAME} not found from {here} upward; set GNOSTIQ_CFG")
 
 
+def read(path):
+    with path.open("rb") as f:
+        return tomllib.load(f)
+
+
 def load(path=None):
     path = Path(path or find()).resolve()
-    with path.open("rb") as f:
-        raw = tomllib.load(f)
+    raw = read(path)
+    donor, borrowed = "", None
+    src = raw.get("model", {}).get("from")
+    if src:
+        # the networks only hold where window, truth, inputs and leads match their training, so all of it comes from src
+        extra = sorted(set(raw) - {"site", "paths", "model"}) + [f"model.{k}" for k in raw["model"] if k != "from"]
+        if extra:
+            raise ValueError(f"{path}: borrows its networks from {src}, so set only [site] and [paths]: {extra}")
+        base = read(path.parent / src)
+        if "from" in base.get("model", {}):
+            raise ValueError(f"{path}: {src} borrows its networks too")
+        d = load(path.parent / src)
+        if d.paths.data == (path.parent / raw.get("paths", {}).get("data", "")).resolve():
+            raise ValueError(f"{path}: shares its data directory with {src}")
+        if d.site.name == raw.get("site", {}).get("name"):
+            raise ValueError(f"{path}: has the same site name as {src}")
+        raw = {**base, "site": raw.get("site", {}), "paths": raw.get("paths", {})}
+        donor, borrowed = d.site.name, d.paths.models
 
     def need(section, key):
         try:
@@ -195,8 +219,9 @@ def load(path=None):
         wet_mm=float(need("forecast", "wet_mm")),
         heavy_mm=float(need("forecast", "heavy_mm")),
         model=model,
-        paths=Paths(path.parent / need("paths", "data")),
+        paths=Paths((path.parent / need("paths", "data")).resolve(), borrowed),
         source=path,
+        donor=donor,
     )
     errs = check(c)
     if errs:
@@ -208,6 +233,8 @@ def check(c):
     errs = []
     s, w = c.site, c.window
 
+    if not re.fullmatch(r"[a-z][a-z0-9_-]*", s.name):
+        errs.append(f"site.name must be lowercase letters, digits, - or _, as it goes in URLs: {s.name}")
     if len(s.bbox) != 4:
         errs.append("site.bbox needs 4 values: lat0, lat1, lon0, lon1")
     else:
@@ -257,6 +284,20 @@ def check(c):
     if m.seeds < 1 or m.hidden < 4 or m.max_epochs < 1 or m.patience < 1 or m.eff_max <= 0:
         errs.append("model settings out of range")
     return errs
+
+
+def sites(c):
+    # this config first, then gnostiq.toml and every gnostiq-*.toml beside it
+    d = c.source.parent
+    out = [c]
+    for p in [d / FILENAME, *sorted(d.glob("gnostiq-*.toml"))]:
+        if p.is_file() and p.resolve() != c.source:
+            out.append(load(p))
+    names = [x.site.name for x in out]
+    dup = sorted({n for n in names if names.count(n) > 1})
+    if dup:
+        raise ValueError(f"more than one config in {c.source.parent} for {', '.join(dup)}")
+    return out
 
 
 @functools.cache
