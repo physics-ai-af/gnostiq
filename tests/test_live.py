@@ -50,12 +50,23 @@ def test_check_scores_what_was_shown_against_the_reports(issued, monkeypatch):
     assert t["systems"]["raw"]["mae"] == pytest.approx(1.0) and t["systems"]["raw"]["bias"] == pytest.approx(-1.0)
     assert t["systems"]["gnostiq"]["n"] == t["systems"]["raw"]["n"] == t["systems"]["clim"]["n"] == t["cases"]
     assert t["systems"][f"raw:{c.nwp.extra[0]}"]["n"] <= t["cases"]
-    assert set(t["skill"]) == {"raw", "clim"} and all(
-        s is None or s["lo"] <= s["skill"] <= s["hi"] for s in t["skill"].values()
-    )
+    assert set(t["skill"]) == {"raw", "lapse", "clim"}
+    assert all(s is None or s["lo"] <= s["skill"] <= s["hi"] for s in t["skill"].values())
+    assert out["reports"] == rep.valid.nunique()
     assert t["daily"] and all({"day", "gnostiq", "raw"} <= set(d) for d in t["daily"])
     assert json.loads((c.paths.reports / "live.json").read_text()) == out
     assert (c.paths.reports / "live.md").read_text().startswith(f"# Live check: {c.site.name}")
+
+
+def test_check_with_no_reports_at_all_says_so(issued, monkeypatch):
+    c, _ = issued
+    none = pd.DataFrame(
+        {"valid": pd.Series(dtype="datetime64[ns]"), "obs": pd.Series(dtype=float), "var": pd.Series(dtype=str)}
+    )
+    monkeypatch.setattr(live, "reports", lambda c, since, until: none)
+    out = live.run(c)
+    assert out["reports"] == 0 and out["issues"] == 1
+    assert all(v["cases"] == 0 and not v["systems"] and not v["daily"] for v in out["vars"].values())
 
 
 def test_check_without_issued_forecasts_says_what_to_run(trained):

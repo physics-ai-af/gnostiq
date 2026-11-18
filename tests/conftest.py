@@ -39,6 +39,31 @@ def write_cfg(tmp_path, edits=None):
     return p
 
 
+NEARBY = """[site]
+name = "nearby"
+wmo = "65000"
+icao = "DNXX"
+lat = 9.64
+lon = 8.87
+elev_m = 1400.0
+tz = "Africa/Lagos"
+bbox = [9.4, 10.1, 8.6, 9.2]
+
+[model]
+from = "gnostiq.toml"
+
+[paths]
+data = "nearby"
+"""
+
+
+def write_nearby(tmp_path, text=NEARBY):
+    # a second site on the first site's networks
+    p = tmp_path / "gnostiq-nearby.toml"
+    p.write_text(text)
+    return p
+
+
 @pytest.fixture(scope="session")
 def station_raw(tmp_path_factory):
     c = cfg.load(write_cfg(tmp_path_factory.mktemp("station"), SMALL))

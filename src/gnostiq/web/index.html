@@ -9,14 +9,14 @@
   color-scheme: light;
   --surface: #fcfcfb; --card: #ffffff; --rule: #e7e6e2; --text: #0b0b0b; --text2: #52514e; --text3: #7b7a75;
   --gnostiq: #2a78d6; --raw: #eb6834; --emos: #1baf7a; --band: #cde2fb; --p1: #86b6ef; --p2: #1c5cab;
-  --icon: #8a5cd0; --gfs: #a88400; --normal: #ecebe7; --emos2: #138a9e;
+  --icon: #8a5cd0; --gfs: #a88400; --normal: #ecebe7; --emos2: #138a9e; --lapse: #b3305f; --note: #f4f3ef;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
     --surface: #1a1a19; --card: #222220; --rule: #383835; --text: #f0efec; --text2: #c3c2b7; --text3: #8f8e86;
     --gnostiq: #3987e5; --raw: #d95926; --emos: #199e70; --band: #184f95; --p1: #86b6ef; --p2: #256abf;
-    --icon: #a07ee6; --gfs: #c9a227; --normal: #30302d; --emos2: #3cb6c9;
+    --icon: #a07ee6; --gfs: #c9a227; --normal: #30302d; --emos2: #3cb6c9; --lapse: #e0608e; --note: #2a2a28;
   }
 }
 * { box-sizing: border-box; }
@@ -51,11 +51,16 @@ th { color: var(--text3); font-weight: 500; }
 .cases { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
 .empty { color: var(--text3); padding: 18px 0; }
 footer { margin-top: 48px; color: var(--text3); font-size: 12px; }
+.sites { display: flex; gap: 6px; margin: 0 0 14px; flex-wrap: wrap; }
+.sites a { font-size: 12px; color: var(--text2); text-decoration: none; border: 1px solid var(--rule); border-radius: 6px; padding: 3px 10px; }
+.sites a[aria-current] { color: var(--text); border-color: var(--text3); font-weight: 600; }
+.note { background: var(--note); border: 1px solid var(--rule); border-radius: 8px; padding: 10px 14px; margin-top: 12px; color: var(--text2); }
 a { color: inherit; }
 </style>
 </head>
 <body>
 <main>
+  <nav class="sites" id="sites" aria-label="Site"></nav>
   <div class="head"><h1 id="title">Gnostiq</h1><span class="sub" id="meta"></span></div>
   <p id="tagline">Global model forecasts corrected for one site, with uncertainty, checked against observations the model never saw.</p>
 
@@ -68,7 +73,7 @@ a { color: inherit; }
 
   <h2>Verification</h2>
   <p id="vmeta"></p>
-  <div class="filters"><label class="sub" for="var">Variable</label>
+  <div class="filters" id="filters"><label class="sub" for="var">Variable</label>
     <select id="var"><option value="t2m">Temperature</option><option value="td2m">Dewpoint</option><option value="tp24">24 h rain</option></select></div>
   <div id="verify"></div>
 
@@ -88,10 +93,13 @@ const NAMES = { gnostiq: "Gnostiq", raw: "Raw model", emos: "EMOS", emos_multi: 
 const ORDER = ["gnostiq", "raw", "emos", "emos_multi", "lapse", "persist", "clim"];
 const LABEL = (s) => NAMES[s] || (s.startsWith("raw:") ? `${MODEL[s.slice(4)] || s.slice(4)} (raw)` : s);
 const label = LABEL;
-const COLOR = { gnostiq: "var(--gnostiq)", raw: "var(--raw)", emos: "var(--emos)", emos_multi: "var(--emos2)", "raw:icon_seamless": "var(--icon)", "raw:gfs_seamless": "var(--gfs)", clim: "var(--text3)" };
+const COLOR = { gnostiq: "var(--gnostiq)", raw: "var(--raw)", emos: "var(--emos)", emos_multi: "var(--emos2)", "raw:icon_seamless": "var(--icon)", "raw:gfs_seamless": "var(--gfs)", clim: "var(--text3)", lapse: "var(--lapse)" };
 const MODEL = { icon_seamless: "ICON", gfs_seamless: "GFS", ecmwf_ifs025: "ECMWF" };
 const $ = (s) => document.querySelector(s);
 const tip = $("#tip");
+const cap = (n) => n.charAt(0).toUpperCase() + n.slice(1);
+let SITE = null;
+const borrowed = () => SITE && SITE.trained_at !== SITE.name;
 
 function el(tag, attrs = {}, parent, text) {
   const svg = ["svg", "g", "path", "line", "rect", "circle", "text", "polygon"].includes(tag);
@@ -215,44 +223,59 @@ function barChart(parent, groups, label) {
   });
 }
 
-function setSite(name) {
-  if (!name) return;
-  const n = name.charAt(0).toUpperCase() + name.slice(1);
+function setSite(s) {
+  const n = cap(s.name);
   $("#title").textContent = document.title = `Gnostiq: ${n}`;
-  $("#tagline").textContent = `Global model forecasts corrected for ${n}, with uncertainty, checked against observations the model never saw.`;
+  $("#tagline").textContent = borrowed()
+    ? `Global model forecasts for ${n}, corrected with what was learned at ${cap(s.trained_at)}. Not verified at ${n}.`
+    : `Global model forecasts corrected for ${n}, with uncertainty, checked against observations the model never saw.`;
+}
+
+function renderSites(sites) {
+  const nav = $("#sites");
+  nav.replaceChildren();
+  if (sites.length < 2) return;
+  for (const s of sites) {
+    const a = el("a", { href: `?site=${s.name}${location.hash}` }, nav, cap(s.name));
+    if (s.name === SITE.name) a.setAttribute("aria-current", "page");
+  }
 }
 
 function renderForecast(f) {
-  setSite(f.site.name);
   const root = $("#forecast");
   root.replaceChildren();
+  const lent = borrowed(), here = cap(f.site.name), from = cap(f.trained_at || ""), base = MODEL[f.base_model] || f.base_model;
+  if (lent) el("p", { class: "note" }, root, `${here} has no public station record good enough to train on or score against. This forecast runs the networks trained at ${from} on ${here}'s own ${base} forecast, after moving it to ${here}'s height ("${base} at ${here} height" below). The band is ${from}'s uncertainty and is probably too narrow here. "Last 30 days" is the only check on it.`);
   const tz = f.site.tz, t = (s) => new Date(s).getTime();
   const dfmt = new Intl.DateTimeFormat("en-GB", { timeZone: tz, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   const day = new Intl.DateTimeFormat("en-GB", { timeZone: tz, weekday: "short", day: "numeric" });
-  $("#meta").textContent = `Issued ${dfmt.format(new Date(f.init_utc))} (${tz}) · input ${f.base_model} · trained ${f.model_trained.slice(0, 10)}`;
+  $("#meta").textContent = `Issued ${dfmt.format(new Date(f.init_utc))} (${tz}) · input ${f.base_model} · trained ${f.model_trained.slice(0, 10)}${lent ? ` at ${from}` : ""}`;
   const h = f.hourly;
   if (!h.length) { el("div", { class: "empty" }, root, "No forecast steps."); return; }
   const x0 = t(h[0].valid_utc), x1 = t(h[h.length - 1].valid_utc), xt = [];
   for (const s of h) { const d = new Date(s.valid_utc); if (new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", hour12: false }).format(d) === "12") xt.push([d.getTime(), day.format(d)]); }
 
-  const others = Object.keys(h[0].models || {}), base = MODEL[f.base_model] || f.base_model, hasClim = !!h[0].clim;
+  const others = Object.keys(h[0].models || {}), hasClim = !!h[0].clim;
   for (const [key, title] of [["t2m", "Temperature, °C"], ["td2m", "Dewpoint, °C"]]) {
     const legend = [["Gnostiq", COLOR.gnostiq], [`${base} (raw)`, COLOR.raw], ...others.map((m) => [`${MODEL[m] || m} (raw)`, COLOR[`raw:${m}`] || "var(--text3)"])];
+    if (lent) legend.push([`${base} at ${here} height`, COLOR.lapse]);
     if (hasClim) legend.push(["Normal for the date", "var(--normal)", 1]);
-    const c = card(root, title, "Line: median. Blue band: 10th to 90th percentile. Grey band: the usual range for that hour and date.", legend);
+    const c = card(root, title, "Line: median. Blue band: 10th to 90th percentile." + (hasClim ? " Grey band: the usual range for that hour and date." : ""), legend);
     const series = [];
     if (hasClim) series.push({ name: "Normal", color: "var(--text3)", noLine: 1, bandFill: "var(--normal)", pts: h.map((s) => [t(s.valid_utc), s.clim[key].q50, s.clim[key].q10, s.clim[key].q90]), band: h.map((s) => [t(s.valid_utc), s.clim[key].q10, s.clim[key].q90]) });
     series.push({ name: "Gnostiq", color: COLOR.gnostiq, pts: h.map((s) => [t(s.valid_utc), s[key].q50, s[key].q10, s[key].q90]), band: h.map((s) => [t(s.valid_utc), s[key].q10, s[key].q90]) });
     series.push({ name: `${base} (raw)`, color: COLOR.raw, thin: 1, pts: h.map((s) => [t(s.valid_utc), s.raw[key]]) });
     for (const m of others) series.push({ name: `${MODEL[m] || m} (raw)`, color: COLOR[`raw:${m}`] || "var(--text3)", thin: 1, dash: "4 3", pts: h.map((s) => [t(s.valid_utc), s.models[m][key]]) });
+    if (lent) series.push({ name: `${base} at ${here} height`, color: COLOR.lapse, thin: 1, pts: h.map((s) => [t(s.valid_utc), s.lapse[key]]) });
     lineChart(c.body, {
       label: title, x0, x1, xticks: xt, xfmt: (x) => dfmt.format(new Date(x)),
       tfmt: (p) => (p[2] != null ? `${fx(p[1])} (${fx(p[2])} to ${fx(p[3])})` : fx(p[1])),
       series,
     });
     const cols = ["Time", "q10", "Median", "q90", `${base} (raw)`, ...others.map((m) => `${MODEL[m] || m} (raw)`)];
+    if (lent) cols.push(`${base} at ${here} height`);
     if (hasClim) cols.push("Normal");
-    table(c.tv, cols, h.filter((_, i) => i % 3 === 0).map((s) => [dfmt.format(new Date(s.valid_utc)), fx(s[key].q10), fx(s[key].q50), fx(s[key].q90), fx(s.raw[key]), ...others.map((m) => fx(s.models[m][key])), ...(hasClim ? [fx(s.clim[key].q50)] : [])]));
+    table(c.tv, cols, h.filter((_, i) => i % 3 === 0).map((s) => [dfmt.format(new Date(s.valid_utc)), fx(s[key].q10), fx(s[key].q50), fx(s[key].q90), fx(s.raw[key]), ...others.map((m) => fx(s.models[m][key])), ...(lent ? [fx(s.lapse[key])] : []), ...(hasClim ? [fx(s.clim[key].q50)] : [])]));
   }
 
   const d = f.daily, wet = f.thresholds.wet_mm, heavy = f.thresholds.heavy_mm;
@@ -265,12 +288,13 @@ function renderForecast(f) {
 function renderLive(j) {
   const root = $("#live");
   root.replaceChildren();
-  const t = j.vars.t2m, site = j.site.charAt(0).toUpperCase() + j.site.slice(1);
-  const label = (s) => (s === "raw" ? `${MODEL[j.base] || j.base} (raw)` : LABEL(s));
+  const t = j.vars.t2m, site = cap(j.site), base = MODEL[j.base] || j.base;
+  const label = (s) => (s === "raw" ? `${base} (raw)` : s === "lapse" ? `${base} at ${site} height` : LABEL(s));
   $("#lmeta").textContent = `Forecasts as this page showed them, scored against ${site} airport reports that came in afterwards: ${j.issues} ${j.issues === 1 ? "day" : "days"} of forecasts since ${j.since}. Reports are whole degrees.`;
+  if (j.reports === 0) { el("div", { class: "empty" }, root, `No airport reports from ${site} have come in since ${j.since}, so there is nothing to score yet.`); return; }
   if (!t || !t.cases) { el("div", { class: "empty" }, root, "No reports matched yet. The first scores appear a day after the first forecast."); return; }
   if (t.daily.length) {
-    const sys = ["gnostiq", "raw", ...Object.keys(t.systems).filter((s) => s.startsWith("raw:")), "clim"].filter((s) => t.systems[s]);
+    const sys = ["gnostiq", "raw", ...(borrowed() ? ["lapse"] : []), ...Object.keys(t.systems).filter((s) => s.startsWith("raw:")), "clim"].filter((s) => t.systems[s]);
     const days = t.daily.map((d) => d.day), X = (d) => days.indexOf(d);
     const c = card(root, "Temperature: average error by day, °C", "Lower is better. Every system on the same reports.", sys.map((s) => [label(s), COLOR[s] || "var(--text3)"]));
     lineChart(c.body, {
@@ -372,11 +396,32 @@ async function load(url, sel, render, hint) {
 }
 const hv = location.hash.slice(1);
 if (["t2m", "td2m", "tp24"].includes(hv)) $("#var").value = hv;
-$("#var").onchange = () => { history.replaceState(null, "", "#" + $("#var").value); renderVerify(); };
-load("/api/forecast", "#forecast", renderForecast, "gnostiq run");
-load("/api/live", "#live", renderLive, "gnostiq check");
-load("/api/verify", "#verify", (j) => { CARD = j; setSite(j.meta.site); renderVerify(); }, "gnostiq verify");
-load("/api/cases", "#cases", renderCases, "gnostiq cases");
+$("#var").onchange = () => { history.replaceState(null, "", location.search + "#" + $("#var").value); renderVerify(); };
+
+async function start() {
+  const r = await fetch("/api/sites");
+  const sites = r.ok ? await r.json() : [];
+  if (!sites.length) return;
+  const want = new URLSearchParams(location.search).get("site");
+  SITE = sites.find((s) => s.name === want) || sites[0];
+  renderSites(sites);
+  setSite(SITE);
+  const api = (kind) => `/api/${SITE.name}/${kind}`, cfg = SITE === sites[0] ? "" : ` --config ${SITE.config}`;
+  load(api("forecast"), "#forecast", renderForecast, `gnostiq${cfg} run`);
+  load(api("live"), "#live", renderLive, `gnostiq${cfg} check`);
+  if (borrowed()) {
+    const home = sites.find((s) => s.name === SITE.trained_at), link = home ? `?site=${home.name}` : null;
+    $("#filters").style.display = "none";
+    for (const [sel, what] of [["#verify", "No scorecard"], ["#cases", "No case replays"]]) {
+      const p = el("div", { class: "empty" }, $(sel), `${what} for ${cap(SITE.name)}: there is no station record here to score against. The networks were trained and scored at ${cap(SITE.trained_at)}. `);
+      if (link) el("a", { href: link }, p, `See ${cap(SITE.trained_at)}.`);
+    }
+    return;
+  }
+  load(api("verify"), "#verify", (j) => { CARD = j; renderVerify(); }, `gnostiq${cfg} verify`);
+  load(api("cases"), "#cases", renderCases, `gnostiq${cfg} cases`);
+}
+start();
 </script>
 </body>
 </html>

@@ -43,9 +43,15 @@ The networks learn their spread on the rows they fit, so it comes out narrow on 
 
 CRPS for all three variables, Brier score and equitable threat score at the wet and heavy thresholds, bias, mean absolute error, and coverage of the 80% interval. Skill scores carry 95% intervals from resampling whole days, because errors within a day are dependent. An interval that includes zero is reported as no demonstrated skill.
 
+## Sites without a record
+
+Jos has no public station record that can serve as truth, so nothing can be trained or scored there. It runs the networks trained at Abuja on its own ECMWF forecast, after its own terrain correction. The physics part is Jos's: the model grid sits about 110 m below the Jos airport, against 23 m at Abuja. The learned part and the spread are Abuja's. The networks never saw a plateau site, and Jos inputs sit at the cool edge of the Abuja training data, so the correction may not carry over and the spread is probably too narrow.
+
+The page shows the height-corrected ECMWF beside it and labels the forecast unverified. If airport reports from Jos come in, the live check scores the two against each other, which tests the one thing worth knowing: whether what was learned at Abuja adds anything at Jos beyond the physics.
+
 ## Limits a reader should know
 
-- One site. Nothing here shows the method transfers to other terrain or climate zones.
+- One verified site. Jos runs on Abuja's networks unverified. Nothing here shows the method transfers to other terrain or climate zones.
 - The forecast archive starts in early 2024, so training has at most about two years of pairs, and there is one test wet season. Confidence intervals are correspondingly wide for rain.
 - Public station reports from Nigeria thin out from April 2026, so the Abuja test season is 2025.
 - ECMWF changed the IFS cycle on 12 May 2026. A test window that spans that date mixes two model versions; the 2025 Abuja season does not.

@@ -62,7 +62,8 @@ def run(c, days=DAYS):
     until = pd.Timestamp.now("UTC").tz_localize(None).floor("h")
     since = until - pd.Timedelta(days=days)
     a = a[(a.valid >= since) & (a.valid <= until)]
-    j = score(a.merge(reports(c, since, until), on=["valid", "var"]))
+    rep = reports(c, since, until)
+    j = score(a.merge(rep, on=["valid", "var"]))
 
     # a case counts only if every core system forecast it; ICON's missing day 7 only shrinks its own n
     core = [s for s in ("gnostiq", "raw", "clim") if s in set(j.system)]
@@ -72,7 +73,9 @@ def run(c, days=DAYS):
     rng = np.random.default_rng(0)
 
     out = {"site": c.site.name, "base": c.nwp.base, "since": f"{since:%Y-%m-%d}", "until": f"{until:%Y-%m-%dT%H:%MZ}",
-           "issues": int(a.init.nunique()), "vars": {}}  # fmt: skip
+           "issues": int(a.init.nunique()), "reports": int(rep.valid.nunique()), "vars": {}}  # fmt: skip
+    # the height correction alone; older archives lack it, so it is scored where present
+    refs = [s for s in ("raw", "lapse", "clim") if s in set(j.system)]
     for var in OBS:
         v = j[j["var"] == var]
         systems = {}
@@ -82,10 +85,10 @@ def run(c, days=DAYS):
         mine = v[v.system == "gnostiq"].set_index(["init", "valid"]).crps
         day = mine.index.get_level_values("valid").floor("D")
         skill = {}
-        for ref in core:
-            if ref != "gnostiq":
-                theirs = v[v.system == ref].set_index(["init", "valid"]).crps.reindex(mine.index)
-                skill[ref] = verify.boot_skill(day, mine.to_numpy(), theirs.to_numpy(), rng)
+        for ref in refs:
+            theirs = v[v.system == ref].set_index(["init", "valid"]).crps.reindex(mine.index)
+            ok = theirs.notna().to_numpy()
+            skill[ref] = verify.boot_skill(day[ok], mine.to_numpy()[ok], theirs.to_numpy()[ok], rng)
         daily = v.assign(day=v.valid.dt.strftime("%Y-%m-%d")).pivot_table(index="day", columns="system", values="err")
         out["vars"][var] = {
             "cases": int(len(mine)),
@@ -99,9 +102,8 @@ def run(c, days=DAYS):
     c.paths.reports.mkdir(parents=True, exist_ok=True)
     (c.paths.reports / "live.json").write_text(json.dumps(out, indent=1))
     (c.paths.reports / "live.md").write_text(markdown(out))
-    log.info(
-        "live check: %d issues, %d temperature cases since %s", out["issues"], out["vars"]["t2m"]["cases"], out["since"]
-    )
+    log.info("live check: %d issues, %d reports, %d temperature cases since %s", out["issues"], out["reports"],
+             out["vars"]["t2m"]["cases"], out["since"])  # fmt: skip
     return out
 
 
@@ -115,6 +117,8 @@ def markdown(doc):
         "",
         "Skill is 1 - CRPS/reference; brackets are 95% intervals from resampling whole days. Raw models are scored "
         "as single values, so their CRPS is their absolute error.",
+        "",
+        f"{doc['issues']} days of forecasts, {doc['reports']} reports.",
         "",
     ]
     for var, v in doc["vars"].items():

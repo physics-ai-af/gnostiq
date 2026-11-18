@@ -1,8 +1,10 @@
 # gnostiq
 
-A correction layer for global weather model forecasts at one site: Jos, Nigeria. It takes the ECMWF forecast for the grid cell over Jos, corrects it for the plateau and puts an uncertainty range on it. The result is then checked against station observations from a wet season the model never saw, next to the standard baselines.
+A correction layer for global weather model forecasts at a site. It takes the ECMWF forecast for the grid cell over the site, corrects it for the terrain and puts an uncertainty range on it. The result is checked against station observations from a wet season the model never saw, next to the standard baselines.
 
-Nothing here has been run on real data yet. The tests use synthetic files written in the real on-disk formats. They show the code works, not that the forecasts are any good.
+It runs for two sites in Nigeria. Abuja (`gnostiq.toml`) has a station record good enough to train and score on. Jos (`gnostiq-jos.toml`) does not, so it runs Abuja's networks on its own forecast and height, and says on the page that it is unverified.
+
+The tests use synthetic files written in the real on-disk formats. They show the code works, not that the forecasts are any good; the scorecard does that.
 
 ## Tests
 
@@ -57,13 +59,13 @@ No test touches the network. Downloads are replaced with stand-ins, and anything
 |---|---|
 | `tests/conftest.py` | Shared fixtures: config writer, and from later branches the staged synthetic data |
 | `tests/data/gnostiq.toml` | Frozen copy of the Jos config that the fixtures edit, so changing site leaves the tests alone |
-| `tests/test_cfg.py` | Config loading, lookup order, and every validation rule |
+| `tests/test_cfg.py` | Config loading, lookup order, every validation rule, sites that borrow another's networks |
 | `tests/test_io.py` | Caching, refresh by age, retries, missing files, fallback to a stale copy |
 | `tests/test_requirements.py` | requirements files and Pipfile match pyproject.toml, with pins inside its ranges |
 | `tests/synth.py` | Synthetic raw files in the real formats, used by the fixtures |
 | `tests/test_station.py` | Parsing both sources, NOAA quality flags, trace rain, rain-day rules, station lookup, merge modes |
 | `tests/data/GHCNh_NII0000DNJO_excerpt.psv` | Two rows of the real Jos airport record, with its full header |
-| `tests/test_cli.py` | Argument handling, unknown sources, data directories, helpful errors |
+| `tests/test_cli.py` | Argument handling, unknown sources, data directories, `--config`, helpful errors |
 | `tests/test_gate.py` | Runs the script on a good record, a pinned id, a station away from the site, a daytime-only station and an empty lookup |
 | `tests/test_nwp.py` | Parsing a real response, chunking, request contents, refused groups, assembly, live fallback |
 | `tests/test_physics.py` | Formulas against known values, the terrain prior, wind sign, rain-day boundaries, fallbacks |
@@ -78,10 +80,10 @@ No test touches the network. Downloads are replaced with stand-ins, and anything
 | `tests/test_train.py` | Whole-week validation split, early stopping, spread correction, bundle contents, constraints, the scored model |
 | `tests/test_curve.py` | Nested training sizes, identical test cases for every system, the written report |
 | `tests/test_cases.py` | Case selection, ordering, completeness, and the saved file |
-| `tests/test_run.py` | Lead-day rounding, coverage, physical consistency, input masking, other models, the archive, atomic write |
-| `tests/test_live.py` | One issue per day, common cases, scores against known reports, the written report |
-| `tests/test_api.py` | 404 before reports exist, reports served as written, the page, the method note |
-| `tests/test_pipeline.py` | The whole pipeline through the CLI, then the live run and the API |
+| `tests/test_run.py` | Lead-day rounding, coverage, physical consistency, input masking, other models, the archive, atomic write, a second site on borrowed networks |
+| `tests/test_live.py` | One issue per day, common cases, scores against known reports, no reports at all, the written report |
+| `tests/test_api.py` | 404 before reports exist, reports served as written, every site beside the config, the page, the method note |
+| `tests/test_pipeline.py` | The whole pipeline through the CLI, then the live run for both sites and the API |
 
 ## Setup
 
@@ -167,28 +169,40 @@ Add it to `pyproject.toml`. Then add the same pin to `requirements.txt` (or `req
 
 ## Configuration
 
-Everything that describes the run lives in `gnostiq.toml` at the repo root. Code never hard-codes the site, the dates or the model.
+Everything that describes the run lives in `gnostiq.toml` at the repo root. Code never hard-codes the site, the dates or the model. The values below are Abuja's.
 
-| Key | Default | Notes |
+| Key | Value | Notes |
 |---|---|---|
-| `site.lat`, `lon`, `elev_m` | 9.8667, 8.9, 1295 | Provisional. Two coordinate sets circulate for this station, about 25 km apart. |
-| `site.wmo`, `icao` | 65134, DNJO | The synoptic station and the airport |
-| `site.ghcnh` | empty | NOAA station id. Empty means look it up from the WMO number. |
-| `site.bbox` | 9.4 to 10.1 N, 8.6 to 9.2 E | Search box for station records |
+| `site.name` | `abuja` | Lowercase; it goes in URLs |
+| `site.lat`, `lon`, `elev_m` | 9.0068, 7.2632, 342 | From the gate |
+| `site.wmo`, `icao` | 65125, DNAA | The synoptic station and the airport |
+| `site.ghcnh` | `NIM00065125` | NOAA station id. Empty means look it up from the WMO number. |
+| `site.bbox` | 8.8 to 9.2 N, 7.0 to 7.5 E | Search box for station records |
 | `window.start` | 2021-01-01 | Start of the observation record |
-| `window.train_end`, `test_start`, `test_end` | 2026-03-31, 2026-04-01, 2026-10-31 | The test window is the 2026 wet season. It must never overlap training. |
-| `truth.temp` | `merged` | `ghcnh`, `iem`, or `merged` (station first, METAR fills gaps) |
+| `window.train_end`, `test_start`, `test_end` | 2025-03-31, 2025-04-01, 2025-10-31 | The test window is the 2025 wet season. It must never overlap training. |
+| `truth.temp` | `ghcnh` | `ghcnh`, `iem`, or `merged` (station first, METAR fills gaps) |
 | `truth.rain` | `chirps` | `station` or `chirps` |
 | `truth.chirps_flavor` | `sat` | `sat` or `rnl` |
 | `nwp.base` | `ecmwf_ifs025` | The model being corrected |
-| `nwp.extra` | GFS, ICON | Scored raw, for comparison only |
+| `nwp.extra` | GFS, ICON | Inputs to the networks and to `emos_multi`, and drawn raw on the page |
 | `nwp.start` | 2024-01-01 | Where the forecast archive begins |
 | `forecast.lead_days` | 1 to 7 | |
 | `forecast.wet_mm`, `heavy_mm` | 1, 10 | Rain thresholds |
 | `model.*` | 3 seeds, 64 hidden units | Small on purpose |
-| `paths.data` | `data` | Relative to the config file. Git ignores it. |
+| `paths.data` | `data/abuja` | Relative to the config file. Git ignores `data/`. |
 
-The file is found by walking up from the working directory, or through the `GNOSTIQ_CFG` environment variable. `cfg.load()` validates it and reports every problem in one error, so you fix the file once rather than once per mistake.
+The file is found by walking up from the working directory, through the `GNOSTIQ_CFG` environment variable, or with `gnostiq --config <file>`. `cfg.load()` validates it and reports every problem in one error, so you fix the file once rather than once per mistake.
+
+### More sites
+
+Each further site is a `gnostiq-<name>.toml` beside `gnostiq.toml`, with its own `paths.data`. A site with a record of its own is a full config like the one above. A site without one sets only `[site]`, `[paths]` and
+
+```toml
+[model]
+from = "gnostiq.toml"
+```
+
+It then runs the networks trained for that config, and takes the window, truth, model inputs, lead days and thresholds from it too, since the networks only hold where those match. `gnostiq-jos.toml` is the example. `cfg.sites(c)` returns the config and every one beside it; the server and `--all-sites` use it.
 
 In code:
 
@@ -205,10 +219,10 @@ c.site.lat, c.window.test_start, c.paths.raw
 
 ## Station observations
 
-Two sources of observed weather at Jos:
+Two sources of observed weather at the site:
 
-- **NOAA GHCNh**: the full record of the synoptic station (WMO 65134), one pipe-separated file.
-- **Iowa Environmental Mesonet**: METAR reports from the airport (DNJO), one CSV per year.
+- **NOAA GHCNh**: the full record of the synoptic station (`site.wmo`, or the id in `site.ghcnh`), one pipe-separated file.
+- **Iowa Environmental Mesonet**: METAR reports from the airport (`site.icao`), one CSV per year.
 
 Run the ingestion with the block for your tool:
 
@@ -279,7 +293,7 @@ The station list is parsed loosely on purpose: id, latitude, longitude and eleva
 
 ## Station data gate
 
-Run this before any modelling. It answers one question: is the Jos record good enough to be the truth the forecasts are judged against?
+Run this before any modelling. It answers one question: is the site's record good enough to be the truth the forecasts are judged against?
 
 ### Standard Python (`venv` / `virtualenv`)
 
@@ -337,7 +351,7 @@ If the station reports from more than 1 km away from `site.lat`/`site.lon`, or m
 
 What it measures:
 
-- **Which station this is.** Every distinct latitude, longitude and elevation in the record, with dates. A change part-way through means the station moved. It also works the barometer's height out of the pressure readings, as a check on the listed 1295 m, and compares synoptic temperatures with METAR temperatures at the same hours to see whether they come from one instrument.
+- **Which station this is.** Every distinct latitude, longitude and elevation in the record, with dates. A change part-way through means the station moved. It also works the barometer's height out of the pressure readings, as a check on `site.elev_m`, and compares synoptic temperatures with METAR temperatures at the same hours to see whether they come from one instrument.
 - **Temperature and dewpoint.** Monthly coverage of the eight synoptic hours, the share of days with a reading at each hour of the day, how many test-season days have both a pre-dawn and an afternoon reading, and the longest gap.
 - **Rain.** How many wet-season days have a usable 24 h total, how many of those are explicit zeros, which hours the accumulation reports arrive at, and annual totals to hold against CHIRPS.
 
@@ -347,7 +361,7 @@ A FAIL is often just a station that does not report at night. That shows up plai
 
 ## Forecast archive
 
-Past forecasts for the Jos grid cell, from Open-Meteo's Previous Runs API. For every hour it gives the value that was forecast one day earlier, two days earlier, and so on up to seven. That is what makes it possible to train and score by lead time without storing every model run.
+Past forecasts for the site's grid cell, from Open-Meteo's Previous Runs API. For every hour it gives the value that was forecast one day earlier, two days earlier, and so on up to seven. That is what makes it possible to train and score by lead time without storing every model run.
 
 ### Standard Python (`venv` / `virtualenv`)
 
@@ -953,13 +967,13 @@ hatch run gnostiq run
 pdm run gnostiq run
 ```
 
-fetches the newest model run from Open-Meteo, applies the trained networks and writes `data/reports/forecast.json`. It needs the trained models in `data/models/` and the terrain file `data/processed/static.json`.
+fetches the newest model run from Open-Meteo, applies the trained networks and writes `forecast.json` to the site's `reports/` directory (`data/abuja/reports/` for Abuja). It needs the trained models in `models/`, and fetches the terrain file `processed/static.json` first if it is missing.
 
 The document:
 
 ```
-site, init_utc, base_model, model_trained, thresholds
-hourly[]  valid_utc, lead_day, t2m{q10,q50,q90}, td2m{q10,q50,q90}, raw{t2m,td2m},
+site, init_utc, base_model, model_trained, trained_at, thresholds
+hourly[]  valid_utc, lead_day, t2m{q10,q50,q90}, td2m{q10,q50,q90}, raw{t2m,td2m}, lapse{t2m,td2m},
           models{<extra model>{t2m,td2m}}, clim{t2m{q10,q50,q90}, td2m{q10,q50,q90}}
 daily[]   date, start_utc, lead_day, p_wet, p_heavy, tp24{q50,q90}, raw_tp24
 ```
@@ -969,9 +983,9 @@ Two decisions worth knowing about:
 - **Lead days are rounded up.** The archive's "day 2" forecast was issued somewhere between 48 hours and one model cycle more before the hour it describes. A live step 30 hours ahead is therefore treated as day 2, not day 1. The uncertainty shown errs on the wide side rather than the narrow one.
 - **Inputs the model was not trained on are blanked.** The live API serves pressure levels, CAPE and column water vapour; the training archive does not. Letting them in would shift the terrain correction and the moisture estimate away from what was verified, so `run.py` removes any input missing from the bundle's `cols` list. A test checks that those fields cannot change the forecast.
 
-`models` holds each extra model's raw forecast, fetched live, so the page can draw them next to Gnostiq; a model that is down shows as missing and the forecast still runs. `clim` is the usual range for that hour and date from the station record, and needs `data/interim/obs.parquet`.
+`lapse` is the base model moved to the site's height and nothing else, the physics on its own. `trained_at` names the site the networks were trained for. `models` holds each extra model's raw forecast, fetched live, so the page can draw them next to Gnostiq; a model that is down shows as missing and the forecast still runs. `clim` is the usual range for that hour and date from the station record, and needs `interim/obs.parquet`; a site without a record has none.
 
-The file is written to a temporary name and renamed, so the web server never reads half a file. Each run also saves what it issued to `data/archive/<init>.parquet`: one row per system, variable and hour, exactly as the page showed it.
+The file is written to a temporary name and renamed, so the web server never reads half a file. Each run also saves what it issued to `archive/<init>.parquet`: one row per system, variable and hour, exactly as the page showed it.
 
 ### Live check
 
@@ -1011,7 +1025,7 @@ hatch run gnostiq check
 pdm run gnostiq check
 ```
 
-scores those saved forecasts against the airport reports that came in afterwards. It downloads the last 30 days of reports from IEM (`--days` changes that), keeps the first forecast issued on each UTC day so a day of 3-hourly runs counts once, and scores Gnostiq, each raw model and the normal range on the same reports. It writes `data/reports/live.json` and `live.md`; the page shows them under "Last 30 days".
+scores those saved forecasts against the airport reports that came in afterwards. It downloads the last 30 days of reports from IEM (`--days` changes that), keeps the first forecast issued on each UTC day so a day of 3-hourly runs counts once, and scores Gnostiq, each raw model, the height-corrected base model and the normal range on the same reports. It writes `live.json` and `live.md` beside the forecast; the page shows them under "Last 30 days". `reports` in `live.json` counts the reports that came in, so an empty feed reads as empty rather than as no skill.
 
 This is the evidence that cannot be tuned after the fact: every forecast was saved before the weather happened. Two limits:
 
@@ -1019,6 +1033,74 @@ This is the evidence that cannot be tuned after the fact: every forecast was sav
 - The public Nigerian feed has been thin since April 2026, so the sample grows slowly. Skill intervals need five days of reports before they appear, and a few weeks before they are tight.
 
 On a server, `deploy/gnostiq-check.timer` runs it every morning.
+
+### A second site: Jos
+
+Jos failed the gate: its synoptic record stops in 2021 and the airport reports only by day. Nothing can be trained or scored there, so `gnostiq-jos.toml` borrows Abuja's networks (see More sites under Configuration). Its forecast is Abuja's networks run on Jos's own ECMWF forecast, after the terrain correction for Jos's height: the model cell sits about 110 m below the airport, against 23 m at Abuja, so the height step does more work here.
+
+#### Standard Python (`venv` / `virtualenv`)
+
+```bash
+gnostiq --config gnostiq-jos.toml pull   # only the terrain height; nothing else is needed
+gnostiq --config gnostiq-jos.toml run
+gnostiq --config gnostiq-jos.toml check
+gnostiq run --all-sites                  # every gnostiq*.toml in the repo root, one after another
+gnostiq check --all-sites
+```
+
+#### uv
+
+```bash
+uv run gnostiq --config gnostiq-jos.toml pull   # only the terrain height; nothing else is needed
+uv run gnostiq --config gnostiq-jos.toml run
+uv run gnostiq --config gnostiq-jos.toml check
+uv run gnostiq run --all-sites                  # every gnostiq*.toml in the repo root, one after another
+uv run gnostiq check --all-sites
+```
+
+#### Poetry
+
+```bash
+poetry run gnostiq --config gnostiq-jos.toml pull   # only the terrain height; nothing else is needed
+poetry run gnostiq --config gnostiq-jos.toml run
+poetry run gnostiq --config gnostiq-jos.toml check
+poetry run gnostiq run --all-sites                  # every gnostiq*.toml in the repo root, one after another
+poetry run gnostiq check --all-sites
+```
+
+#### Pipenv
+
+```bash
+pipenv run gnostiq --config gnostiq-jos.toml pull   # only the terrain height; nothing else is needed
+pipenv run gnostiq --config gnostiq-jos.toml run
+pipenv run gnostiq --config gnostiq-jos.toml check
+pipenv run gnostiq run --all-sites                  # every gnostiq*.toml in the repo root, one after another
+pipenv run gnostiq check --all-sites
+```
+
+#### Hatch
+
+```bash
+hatch run gnostiq --config gnostiq-jos.toml pull   # only the terrain height; nothing else is needed
+hatch run gnostiq --config gnostiq-jos.toml run
+hatch run gnostiq --config gnostiq-jos.toml check
+hatch run gnostiq run --all-sites                  # every gnostiq*.toml in the repo root, one after another
+hatch run gnostiq check --all-sites
+```
+
+#### PDM
+
+```bash
+pdm run gnostiq --config gnostiq-jos.toml pull   # only the terrain height; nothing else is needed
+pdm run gnostiq --config gnostiq-jos.toml run
+pdm run gnostiq --config gnostiq-jos.toml check
+pdm run gnostiq run --all-sites                  # every gnostiq*.toml in the repo root, one after another
+pdm run gnostiq check --all-sites
+```
+
+Commands that need a record of the site's own (`build`, `baselines`, `train`, `curve`, `verify`, `cases`, `all`) refuse to run for Jos. With `--all-sites`, a site that fails is logged and the rest still run.
+
+What this does and does not show. It is not verified at Jos. The networks learned Abuja's corrections from Abuja's weather, and Jos inputs sit at the cool edge of what they saw, so the correction may not carry over; the uncertainty band is Abuja's and is probably too narrow on the plateau. The page says so above the Jos forecast. The one check is the live check: if DNJO reports come in, `live.md` scores Gnostiq against the height-corrected ECMWF line, which is the question that matters: does what was learned at Abuja add anything at Jos beyond the physics.
 
 ## API and web page
 
@@ -1066,26 +1148,34 @@ pdm run gnostiq serve --host 0.0.0.0 --port 8080
 
 | Path | Returns |
 |---|---|
-| `/` | The page |
-| `/api/forecast` | `data/reports/forecast.json` |
-| `/api/verify` | `data/reports/scorecard.json` |
-| `/api/cases` | `data/reports/cases.json` |
-| `/api/health` | `{"ok": true, "forecast_init_utc": ...}` |
+| `/` | The page; `/?site=jos` opens another site |
+| `/api/sites` | Every site beside the config: name, the site its networks were trained at, its config file, position |
+| `/api/<site>/forecast` | That site's `forecast.json` |
+| `/api/<site>/verify` | `scorecard.json` |
+| `/api/<site>/cases` | `cases.json` |
+| `/api/<site>/live` | `live.json` |
+| `/api/forecast`, `/api/verify`, `/api/cases`, `/api/live` | The same for the first site, as before |
+| `/api/health` | `{"ok": true, "forecast_init_utc": ..., "sites": {<site>: ...}}` |
 | `/method` | `docs/METHOD.md` as plain text |
+
+`gnostiq serve` serves the config it was started with first, then `gnostiq.toml` and every `gnostiq-*.toml` beside it. Run it from the repo root and both Abuja and Jos are on the page.
 
 The API only reads files. A report that has not been generated yet returns 404 with a message naming it, and the page shows which command to run.
 
-The page is one HTML file with no build step and no external scripts. It has three parts:
+The page is one HTML file with no build step and no external scripts. With more than one site there is a switcher at the top. It has four parts:
 
-- **Forecast**: temperature and dewpoint with the 10th to 90th percentile band next to the raw model, and the daily chance of rain.
+- **Forecast**: temperature and dewpoint with the 10th to 90th percentile band next to the raw models, and the daily chance of rain. For a site on borrowed networks a note says where they were trained and that the site is unverified, and the height-corrected base model is drawn too.
+- **Last 30 days**: the live check.
 - **Verification**: skill by lead time with its intervals, the score table, and a reliability diagram for rain. The selector switches variable; `#t2m`, `#td2m` and `#tp24` in the address deep-link to one.
 - **Heavy-rain cases**: one small chart per replayed day.
+
+A site on borrowed networks has no scorecard or case replays; those two parts link to the site the networks came from.
 
 Every chart has a Table button with the same numbers, and the page follows the system light or dark setting. The footer carries the attribution Open-Meteo, NOAA, IEM and CHIRPS ask for; keep it if you restyle the page.
 
 ## End-to-end test
 
-`tests/test_pipeline.py` drives the whole thing through the command line on synthetic data: `gnostiq all`, then `gnostiq run` with a stand-in for the live forecast, then the API. If a change breaks the wiring between two modules, this is the test that fails.
+`tests/test_pipeline.py` drives the whole thing through the command line on synthetic data: `gnostiq all`, then `gnostiq run` with a stand-in for the live forecast, then the API, then a second site on the first site's networks. If a change breaks the wiring between two modules, this is the test that fails.
 
 ## Running it for real
 
@@ -1094,64 +1184,70 @@ After setting up with your tool as described under Setup:
 ### Standard Python (`venv` / `virtualenv`)
 
 ```bash
-python scripts/gate.py  # then change the keys it lists in gnostiq.toml
-gnostiq pull            # everything; safe to re-run
-gnostiq all             # build, baselines, train, verify, cases
-gnostiq run             # live forecast
-gnostiq serve           # http://127.0.0.1:8000
+python scripts/gate.py                  # then change the keys it lists in gnostiq.toml
+gnostiq pull                            # everything; safe to re-run
+gnostiq all                             # build, baselines, train, verify, cases
+gnostiq --config gnostiq-jos.toml pull  # Jos terrain height
+gnostiq run --all-sites                 # live forecast for Abuja and Jos
+gnostiq serve                           # http://127.0.0.1:8000
 ```
 
 ### uv
 
 ```bash
-uv run python scripts/gate.py  # then change the keys it lists in gnostiq.toml
-uv run gnostiq pull            # everything; safe to re-run
-uv run gnostiq all             # build, baselines, train, verify, cases
-uv run gnostiq run             # live forecast
-uv run gnostiq serve           # http://127.0.0.1:8000
+uv run python scripts/gate.py                  # then change the keys it lists in gnostiq.toml
+uv run gnostiq pull                            # everything; safe to re-run
+uv run gnostiq all                             # build, baselines, train, verify, cases
+uv run gnostiq --config gnostiq-jos.toml pull  # Jos terrain height
+uv run gnostiq run --all-sites                 # live forecast for Abuja and Jos
+uv run gnostiq serve                           # http://127.0.0.1:8000
 ```
 
 ### Poetry
 
 ```bash
-poetry run python scripts/gate.py  # then change the keys it lists in gnostiq.toml
-poetry run gnostiq pull            # everything; safe to re-run
-poetry run gnostiq all             # build, baselines, train, verify, cases
-poetry run gnostiq run             # live forecast
-poetry run gnostiq serve           # http://127.0.0.1:8000
+poetry run python scripts/gate.py                  # then change the keys it lists in gnostiq.toml
+poetry run gnostiq pull                            # everything; safe to re-run
+poetry run gnostiq all                             # build, baselines, train, verify, cases
+poetry run gnostiq --config gnostiq-jos.toml pull  # Jos terrain height
+poetry run gnostiq run --all-sites                 # live forecast for Abuja and Jos
+poetry run gnostiq serve                           # http://127.0.0.1:8000
 ```
 
 ### Pipenv
 
 ```bash
-pipenv run python scripts/gate.py  # then change the keys it lists in gnostiq.toml
-pipenv run gnostiq pull            # everything; safe to re-run
-pipenv run gnostiq all             # build, baselines, train, verify, cases
-pipenv run gnostiq run             # live forecast
-pipenv run gnostiq serve           # http://127.0.0.1:8000
+pipenv run python scripts/gate.py                  # then change the keys it lists in gnostiq.toml
+pipenv run gnostiq pull                            # everything; safe to re-run
+pipenv run gnostiq all                             # build, baselines, train, verify, cases
+pipenv run gnostiq --config gnostiq-jos.toml pull  # Jos terrain height
+pipenv run gnostiq run --all-sites                 # live forecast for Abuja and Jos
+pipenv run gnostiq serve                           # http://127.0.0.1:8000
 ```
 
 ### Hatch
 
 ```bash
-hatch run python scripts/gate.py  # then change the keys it lists in gnostiq.toml
-hatch run gnostiq pull            # everything; safe to re-run
-hatch run gnostiq all             # build, baselines, train, verify, cases
-hatch run gnostiq run             # live forecast
-hatch run gnostiq serve           # http://127.0.0.1:8000
+hatch run python scripts/gate.py                  # then change the keys it lists in gnostiq.toml
+hatch run gnostiq pull                            # everything; safe to re-run
+hatch run gnostiq all                             # build, baselines, train, verify, cases
+hatch run gnostiq --config gnostiq-jos.toml pull  # Jos terrain height
+hatch run gnostiq run --all-sites                 # live forecast for Abuja and Jos
+hatch run gnostiq serve                           # http://127.0.0.1:8000
 ```
 
 ### PDM
 
 ```bash
-pdm run python scripts/gate.py  # then change the keys it lists in gnostiq.toml
-pdm run gnostiq pull            # everything; safe to re-run
-pdm run gnostiq all             # build, baselines, train, verify, cases
-pdm run gnostiq run             # live forecast
-pdm run gnostiq serve           # http://127.0.0.1:8000
+pdm run python scripts/gate.py                  # then change the keys it lists in gnostiq.toml
+pdm run gnostiq pull                            # everything; safe to re-run
+pdm run gnostiq all                             # build, baselines, train, verify, cases
+pdm run gnostiq --config gnostiq-jos.toml pull  # Jos terrain height
+pdm run gnostiq run --all-sites                 # live forecast for Abuja and Jos
+pdm run gnostiq serve                           # http://127.0.0.1:8000
 ```
 
-Read `data/reports/gate.md` first, then `data/reports/qc.md`, then `data/reports/scorecard.md`.
+Read `data/abuja/reports/gate.md` first, then `qc.md`, then `scorecard.md` in the same directory.
 
 Method and limits are written up in [docs/METHOD.md](docs/METHOD.md).
 
@@ -1187,10 +1283,11 @@ The other tools work on a server too, as long as the environment lands in `.venv
 | PDM | `pdm install --prod` | Yes, by default |
 | Hatch | `hatch env create` | No. Point `ExecStart` in both units at the path `hatch env find` prints. |
 
-From your machine, copy the trained models, the reports and the terrain file:
+From your machine, copy the trained models, the reports and the terrain files:
 
 ```
-rsync -a --relative data/models data/reports data/processed/static.json data/interim/obs.parquet <server>:/opt/gnostiq/app/
+rsync -a --relative data/abuja/models data/abuja/reports data/abuja/processed/static.json data/abuja/interim/obs.parquet \
+    data/jos/processed/static.json <server>:/opt/gnostiq/app/
 ```
 
 Then install the services from `deploy/`:
@@ -1202,7 +1299,7 @@ sudo systemctl enable --now gnostiq-api.service gnostiq-run.timer gnostiq-check.
 sudo systemctl start gnostiq-run.service     # first forecast now, not in three hours
 ```
 
-The run timer refreshes the forecast every three hours and saves each one under `data/archive/`. The check timer scores those saved forecasts against new airport reports every morning; the first scores appear the day after the first forecast. `data/interim/obs.parquet` in the copy above is the station record the "normal for the date" range is computed from. For HTTPS, install Caddy and put your domain in `deploy/Caddyfile`.
+The run timer refreshes the forecast for every site every three hours and saves each one under the site's `archive/`. The check timer scores those saved forecasts against new airport reports every morning; the first scores appear the day after the first forecast. `data/abuja/interim/obs.parquet` in the copy above is the station record the "normal for the date" range is computed from. For HTTPS, install Caddy and put your domain in `deploy/Caddyfile`.
 
 To check it: `curl localhost:8000/api/health` shows when the forecast was issued, and `journalctl -u gnostiq-run` shows the last run.
 
@@ -1240,7 +1337,7 @@ The pipeline runs end to end and every test passes, on synthetic data. No real-d
 ## Known gaps
 
 - **No CAPE, column water vapour or pressure-level inputs.** The lead-time archive does not have them for ECMWF. The rain model's moisture supply is estimated from surface dewpoint, and the terrain correction uses the standard 6.5 K/km. Two ways to close this: use GFS CAPE as an extra predictor, since the archive has it, or pull whole ECMWF runs through Open-Meteo's Single Runs API, which is a bigger ingest job.
-- **One site and one test season.** Nothing here shows the method carries over to other terrain.
+- **One verified site and one test season.** Jos runs Abuja's networks unverified. Nothing here shows the method carries over to other terrain until the Jos live check has a few weeks of reports.
 - **The IFS changed cycle on 12 May 2026**, inside the default test window. Training data comes from the earlier cycle.
 
 ## Troubleshooting
