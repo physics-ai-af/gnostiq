@@ -133,7 +133,8 @@ def predict_hourly(b, df):
 
     t_mu, t_sig = mix(o[:, 0], o[:, 1])
     td_mu, td_sig = mix(o[:, 2], o[:, 3])
-    return t_mu, t_sig, td_mu, td_sig
+    k = b.get("inflate", {})
+    return t_mu, t_sig * k.get("t", 1.0), td_mu, td_sig * k.get("td", 1.0)
 
 
 @torch.no_grad()

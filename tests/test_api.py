@@ -48,6 +48,8 @@ def test_page_is_served_and_talks_to_the_api(site):
     for url in ("/api/forecast", "/api/verify", "/api/cases"):
         assert url in r.text
     assert "Open-Meteo" in r.text and "CHIRPS" in r.text
+    # the site comes from the data, so one page serves any site
+    assert "Jos" not in r.text and "f.site.name" in r.text and "j.meta.site" in r.text
 
 
 def test_method_note_is_served_when_present(site):

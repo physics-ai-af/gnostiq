@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gnostiq: Jos</title>
+<title>Gnostiq</title>
 <style>
 :root {
   color-scheme: light;
@@ -54,8 +54,8 @@ a { color: inherit; }
 </head>
 <body>
 <main>
-  <div class="head"><h1>Gnostiq: Jos</h1><span class="sub" id="meta"></span></div>
-  <p>Global model forecasts corrected for the Jos Plateau, with uncertainty, checked against observations the model never saw.</p>
+  <div class="head"><h1 id="title">Gnostiq</h1><span class="sub" id="meta"></span></div>
+  <p id="tagline">Global model forecasts corrected for one site, with uncertainty, checked against observations the model never saw.</p>
 
   <h2>Forecast</h2>
   <div id="forecast"></div>
@@ -78,8 +78,8 @@ a { color: inherit; }
 <div id="tip"></div>
 <script>
 const NS = "http://www.w3.org/2000/svg";
-const NAMES = { gnostiq: "Gnostiq", raw: "Raw model", emos: "EMOS", clim: "Climatology", persist: "Persistence", lapse: "Height-corrected" };
-const ORDER = ["gnostiq", "raw", "emos", "lapse", "persist", "clim"];
+const NAMES = { gnostiq: "Gnostiq", raw: "Raw model", emos: "EMOS", emos_multi: "EMOS, all models", clim: "Climatology", persist: "Persistence", lapse: "Height-corrected" };
+const ORDER = ["gnostiq", "raw", "emos", "emos_multi", "lapse", "persist", "clim"];
 const label = (s) => NAMES[s] || s.replace("raw:", "Raw ");
 const COLOR = { gnostiq: "var(--gnostiq)", raw: "var(--raw)", emos: "var(--emos)" };
 const $ = (s) => document.querySelector(s);
@@ -207,7 +207,15 @@ function barChart(parent, groups, label) {
   });
 }
 
+function setSite(name) {
+  if (!name) return;
+  const n = name.charAt(0).toUpperCase() + name.slice(1);
+  $("#title").textContent = document.title = `Gnostiq: ${n}`;
+  $("#tagline").textContent = `Global model forecasts corrected for ${n}, with uncertainty, checked against observations the model never saw.`;
+}
+
 function renderForecast(f) {
+  setSite(f.site.name);
   const root = $("#forecast");
   root.replaceChildren();
   const tz = f.site.tz, t = (s) => new Date(s).getTime();
@@ -318,7 +326,7 @@ const hv = location.hash.slice(1);
 if (["t2m", "td2m", "tp24"].includes(hv)) $("#var").value = hv;
 $("#var").onchange = () => { history.replaceState(null, "", "#" + $("#var").value); renderVerify(); };
 load("/api/forecast", "#forecast", renderForecast, "gnostiq run");
-load("/api/verify", "#verify", (j) => { CARD = j; renderVerify(); }, "gnostiq verify");
+load("/api/verify", "#verify", (j) => { CARD = j; setSite(j.meta.site); renderVerify(); }, "gnostiq verify");
 load("/api/cases", "#cases", renderCases, "gnostiq cases");
 </script>
 </body>

@@ -17,7 +17,7 @@ def lead_days(valid, init):
     return np.maximum(np.ceil(np.asarray((valid - init) / pd.Timedelta(hours=24))).astype(int), 1)
 
 
-def forecast(c, frame, init):
+def forecast(c, frame, init, extras=None):
     hb = model.load(c.paths.models / "hourly.pt")
     db = model.load(c.paths.models / "daily.pt")
     top = max(c.lead_days)
@@ -25,6 +25,7 @@ def forecast(c, frame, init):
     # blank inputs the nets never saw in training
     frame = frame.assign(lead_day=0, **{k: np.nan for k in physics.NWP_COLS if k not in hb["cols"]})
     h = physics.hourly_features(frame, c.site, static.z_model(c))
+    h = physics.add_extras(h, extras or {}, keys=("valid",))
     h["lead_day"] = lead_days(h.valid, init)
     fut = h[(h.valid > init) & (h.lead_day <= top) & h.t_prior.notna() & h.dep_prior.notna()].reset_index(drop=True)
     t_mu, t_sig, td_mu, td_sig = model.predict_hourly(hb, fut)
@@ -80,7 +81,7 @@ def forecast(c, frame, init):
 def run(c):
     frame, _ = nwp.live(c)
     init = pd.Timestamp.now("UTC").tz_localize(None).floor("h")
-    doc = forecast(c, frame, init)
+    doc = forecast(c, frame, init, nwp.live_extra(c))
     c.paths.reports.mkdir(parents=True, exist_ok=True)
     path = c.paths.reports / "forecast.json"
     tmp = path.with_name(path.name + ".part")

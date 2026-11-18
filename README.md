@@ -75,7 +75,8 @@ No test touches the network. Downloads are replaced with stand-ins, and anything
 | `tests/test_baselines.py` | Each baseline recovers a known signal; no test-window leakage; persistence timing |
 | `tests/test_verify.py` | Threat score, bootstrap, reliability bins, common cases, a baseline-only scorecard |
 | `tests/test_model.py` | The untrained net returns the prior; constraints hold for random weights; losses; round trip |
-| `tests/test_train.py` | Whole-week validation split, early stopping, bundle contents, constraints, the scored model |
+| `tests/test_train.py` | Whole-week validation split, early stopping, spread correction, bundle contents, constraints, the scored model |
+| `tests/test_curve.py` | Nested training sizes, identical test cases for every system, the written report |
 | `tests/test_cases.py` | Case selection, ordering, completeness, and the saved file |
 | `tests/test_run.py` | Lead-day rounding, coverage, physical consistency, input masking, atomic write |
 | `tests/test_api.py` | 404 before reports exist, reports served as written, the page, the method note |
@@ -604,6 +605,8 @@ Read `data/reports/qc.md` after the first real build. A check that removes hundr
 
 `split` is `train` from `nwp.start` to `window.train_end`, `test` inside the test window, and `other` for everything else. Nothing labelled `test` is used for fitting anywhere in the code. `other` covers days after the test window ends: kept, never fitted on, never scored.
 
+Each extra model in `nwp.extra` is joined onto the base forecast by valid hour and lead day, as three columns: `x_<model>_dt2m` and `x_<model>_dtd2m`, its temperature and dewpoint minus the base model's, and `x_<model>_ok`, 1 where it had a forecast. Offsets rather than raw values, so the network learns when to trust which model; ICON has no day 7, and `ok` tells the network so.
+
 Rain days start at 06 UTC when the truth is the station gauge, because that is how synoptic rain is reported, and at 00 UTC when the truth is CHIRPS. The forecast is summed over whichever day the truth uses.
 
 A pair where the observation and the terrain-corrected forecast differ by more than 15 degC is dropped. At that size one of the two is broken, and there is no way to tell which from here.
@@ -657,9 +660,10 @@ pdm run gnostiq baselines
 | `raw` | The model's grid-cell value | The model's 24 h total |
 | `lapse` | `raw` moved to station height | not applicable |
 | `emos` | Gaussian regression on the terrain-corrected forecast, fitted by minimum CRPS, one fit per lead day | Logistic regression for wet or dry, gamma regression for the amount |
+| `emos_multi` | `emos` with each extra model's offset as another predictor | not applicable |
 | `raw:<model>` | Each extra model, raw | Same |
 
-`emos` is the one that counts. Beating a raw model that sits 113 m too low proves very little. A method that cannot beat a standard statistical correction has not earned its complexity.
+`emos` is the one that counts. `emos_multi` is there because the network also sees the extra models: it gets the same inputs through the standard method, so a win over it is a win for the method, not for having more models. Beating a raw model that sits 113 m too low proves very little. A method that cannot beat a standard statistical correction has not earned its complexity.
 
 Climatology is fitted only on observations before the test window. Persistence only uses observations that existed when the forecast was issued. Both are tested.
 
@@ -720,7 +724,7 @@ How it keeps the comparison fair:
 
 Also reported: bias, mean absolute error, how often the 80% interval contained the truth, equitable threat score for rain, results by lead day and by month, and reliability tables for the rain probabilities.
 
-Start with the lines `CRPSS vs emos`.
+Start with the lines `CRPSS vs emos`, then `CRPSS vs emos_multi`: the same standard method given the same extra models the network sees. A lead over both is a lead for the method itself.
 
 ## Correction networks
 
@@ -814,11 +818,55 @@ How it trains:
 - Every fifth calendar week of the training window is held out for early stopping. Whole weeks, because neighbouring hours are nearly copies of each other and a random split would leak.
 - Adam, batches of 512. Training stops when the held-out loss has not improved for `model.patience` epochs, and the best weights are kept.
 - `model.seeds` networks are trained from different starting points and averaged.
+- The extra models enter as inputs (see the training tables section).
+- The spread is then corrected on the held-out weeks: one factor each for temperature and dewpoint, chosen to minimise CRPS there, and stored in the bundle as `inflate`. The networks learn their spread on rows they have already fitted, so without it the forecast ranges come out too narrow.
 - The test window is never touched.
 
 Each bundle records `cols`: the forecast inputs that actually had data during training. The live forecast uses that list to blank out anything the model never saw.
 
 On a laptop CPU the default settings take a few minutes.
+
+### Learning curve
+
+#### Standard Python (`venv` / `virtualenv`)
+
+```bash
+gnostiq curve
+```
+
+#### uv
+
+```bash
+uv run gnostiq curve
+```
+
+#### Poetry
+
+```bash
+poetry run gnostiq curve
+```
+
+#### Pipenv
+
+```bash
+pipenv run gnostiq curve
+```
+
+#### Hatch
+
+```bash
+hatch run gnostiq curve
+```
+
+#### PDM
+
+```bash
+pdm run gnostiq curve
+```
+
+answers "how much archive does this need?". It refits EMOS, `emos_multi` and the network on 1, 2, 3 and 6 months of training pairs and on all of them, and scores every size on the same test cases. The months are whole weeks drawn at random from the training window, so each size spans the seasons, and each size contains the smaller ones. Climatology always uses the full station record, since it needs no archived forecasts.
+
+It writes `data/reports/curve.md` and `curve.json`. Read `vs emos` down the table: if the network stays ahead of EMOS as the archive shrinks, the method is earning its keep on little data. It takes a few minutes and is not part of `gnostiq all`.
 
 ## Case replays
 

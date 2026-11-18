@@ -38,9 +38,11 @@ def clim_hourly(c, obs, col, valid):
     return mu, np.where(np.isfinite(sigma), sigma, np.nanstd(res))
 
 
-def emos_design(p, prior, lon):
+def emos_design(p, prior, lon, extra=()):
     h, d = cyc(p.valid, lon)
-    x = np.column_stack([np.ones(len(p)), p[prior].to_numpy(float), np.sin(h), np.cos(h), np.sin(d), np.cos(d)])
+    # a missing extra model counts as agreeing with the base
+    alt = [p[k].fillna(0.0).to_numpy(float) for k in extra]
+    x = np.column_stack([np.ones(len(p)), p[prior].to_numpy(float), *alt, np.sin(h), np.cos(h), np.sin(d), np.cos(d)])
     z = np.column_stack([np.ones(len(p)), np.sin(h), np.cos(h)])
     return x, z
 
@@ -56,14 +58,26 @@ def emos_fit(x, z, y):
     return optimize.minimize(loss, np.concatenate([b0, g0]), method="L-BFGS-B").x
 
 
+def emos(c, fit, target, prior, ocol, extra=(), name="emos"):
+    mu, sg = np.full(len(target), np.nan), np.full(len(target), np.nan)
+    for lead in c.lead_days:
+        a = fit[(fit.lead_day == lead) & fit[prior].notna() & fit[ocol].notna()]
+        sel = ((target.lead_day == lead) & target[prior].notna()).to_numpy()
+        if len(a) < 100:
+            log.warning("%s %s lead %d: %d training rows, skipped", name, ocol, lead, len(a))
+            continue
+        x, z = emos_design(a, prior, c.site.lon, extra)
+        th = emos_fit(x, z, a[ocol].to_numpy(float))
+        x, z = emos_design(target[sel], prior, c.site.lon, extra)
+        nb = x.shape[1]
+        mu[sel], sg[sel] = x @ th[:nb], np.exp(np.clip(z @ th[nb:], -4, 4))
+    return mu, sg
+
+
 def hourly(c):
     p = pd.read_parquet(c.paths.processed / "pairs_hourly.parquet")
     obs = pd.read_parquet(c.paths.interim / "obs.parquet").rename(columns={"t": "o_t2m", "td": "o_td2m"})
-    extras = {}
-    for m in c.nwp.extra:
-        path = c.paths.interim / f"nwp_{m}.parquet"
-        if path.exists():
-            extras[m] = pd.read_parquet(path, columns=["valid", "lead_day", "f_t2m", "f_td2m"])
+    extras = align.extras(c)
 
     out = []
     for var, (ocol, fcol, prior) in HVARS.items():
@@ -82,18 +96,12 @@ def hourly(c):
         for m, e in extras.items():
             emit(f"raw:{m}", q[["valid", "lead_day"]].merge(e, on=["valid", "lead_day"], how="left")[fcol])
 
-        mu, sg = np.full(len(q), np.nan), np.full(len(q), np.nan)
-        for lead in c.lead_days:
-            sel = ((q.lead_day == lead) & q[prior].notna()).to_numpy()
-            tr = sel & (q.split == "train").to_numpy()
-            if tr.sum() < 100:
-                log.warning("emos %s lead %d: %d training rows, skipped", var, lead, tr.sum())
-                continue
-            x, z = emos_design(q[tr], prior, c.site.lon)
-            th = emos_fit(x, z, q.loc[tr, ocol].to_numpy(float))
-            x, z = emos_design(q[sel], prior, c.site.lon)
-            mu[sel], sg[sel] = x @ th[: x.shape[1]], np.exp(np.clip(z @ th[x.shape[1] :], -4, 4))
-        emit("emos", mu, sg)
+        fit = q[q.split == "train"]
+        emit("emos", *emos(c, fit, q, prior, ocol))
+        # same method, same extra models as gnostiq gets: the fair reference for its inputs
+        extra = physics.extra_deltas(q, var)
+        if extra:
+            emit("emos_multi", *emos(c, fit, q, prior, ocol, extra, name="emos_multi"))
 
     pred = pd.concat(out, ignore_index=True).dropna(subset=["mu"])
     pred.to_parquet(c.paths.processed / "pred_hourly_base.parquet", index=False)

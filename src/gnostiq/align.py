@@ -38,11 +38,21 @@ def split(c, day):
     return lab
 
 
+def extras(c):
+    out = {}
+    for m in c.nwp.extra:
+        path = c.paths.interim / f"nwp_{m}.parquet"
+        if path.exists():
+            out[m] = pd.read_parquet(path, columns=["valid", "lead_day", "f_t2m", "f_td2m"])
+    return out
+
+
 def features(c):
     path = c.paths.interim / f"nwp_{c.nwp.base}.parquet"
     if not path.exists():
         raise FileNotFoundError(f"{path} missing; run `gnostiq pull`")
-    return physics.hourly_features(pd.read_parquet(path), c.site, static.z_model(c))
+    h = physics.hourly_features(pd.read_parquet(path), c.site, static.z_model(c))
+    return physics.add_extras(h, extras(c))
 
 
 def build(c):

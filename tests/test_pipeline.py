@@ -66,6 +66,7 @@ def test_live_forecast_reaches_the_page(repo):
     c, mp = repo
     init = pd.Timestamp.now("UTC").tz_localize(None).floor("h")
     mp.setattr(nwp, "live", lambda c, days=9: (synth.live_frame(c, init), 1182.0))
+    mp.setattr(nwp, "live_extra", lambda c, days=9: {})
     cli.main(["run"])
 
     client = TestClient(api.create(c))

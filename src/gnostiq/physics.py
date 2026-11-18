@@ -22,6 +22,27 @@ NWP_COLS = [
 ]  # fmt: skip
 
 
+def extra_feats(models):
+    return [f"x_{m}_{v}" for m in models for v in ("dt2m", "dtd2m", "ok")]
+
+
+def extra_deltas(df, var):
+    return [k for k in df if k.startswith("x_") and k.endswith(f"_d{var}")]
+
+
+def add_extras(df, extras, keys=("valid", "lead_day")):
+    # other models as offsets from the base, so the net can learn when to trust which
+    keys = list(keys)
+    for m, e in extras.items():
+        e = e[[*keys, "f_t2m", "f_td2m"]].drop_duplicates(keys).rename(columns={"f_t2m": "_t", "f_td2m": "_td"})
+        df = df.merge(e, on=keys, how="left")
+        df[f"x_{m}_dt2m"] = df._t - df.f_t2m
+        df[f"x_{m}_dtd2m"] = df._td - df.f_td2m
+        df[f"x_{m}_ok"] = df._t.notna().astype(float)
+        df = df.drop(columns=["_t", "_td"])
+    return df
+
+
 def es(t):
     return 6.112 * np.exp(17.67 * t / (t + 243.5))
 
