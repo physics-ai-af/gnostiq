@@ -64,7 +64,20 @@ def chunks(start, end, days):
         a = b + pd.Timedelta(days=1)
 
 
+def unreadable(c):
+    bad = []
+    for p in sorted((c.paths.raw / "nwp").glob("*/*.json")):
+        try:
+            json.loads(p.read_bytes())
+        except ValueError:
+            bad.append(p)
+    return bad
+
+
 def pull(c, refresh=False):
+    for p in unreadable(c):
+        log.warning("refetching unreadable %s/%s", p.parent.name, p.name)
+        p.unlink()
     today = pd.Timestamp.now("UTC").tz_localize(None).floor("D")
     for model in (c.nwp.base, *c.nwp.extra):
         groups = GROUPS if model == c.nwp.base else {"core": GROUPS["core"]}
@@ -84,6 +97,7 @@ def pull(c, refresh=False):
                         path,
                         {**base_params(c, model), "hourly": hourly, "start_date": str(a), "end_date": str(b)},
                         max_age=6 * 3600 if live else None,
+                        check=json.loads,
                     )
                 except Missing as e:
                     if gname == "core" and model == c.nwp.base:
@@ -111,6 +125,13 @@ def parse_prev(js, gvars, leads):
 
 
 def build(c):
+    # older versions cached whatever came back; drop broken chunks so the next pull refetches them
+    bad = unreadable(c)
+    if bad:
+        for p in bad:
+            p.unlink()
+        names = ", ".join(f"{p.parent.name}/{p.name}" for p in bad)
+        raise RuntimeError(f"removed {len(bad)} unreadable forecast chunk(s): {names}; run `gnostiq pull --only nwp`")
     out = {}
     for model in (c.nwp.base, *c.nwp.extra):
         d = c.paths.raw / "nwp" / model

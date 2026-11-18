@@ -1,3 +1,4 @@
+import json
 import os
 import time
 
@@ -79,3 +80,17 @@ def test_falls_back_to_stale_copy_when_refresh_fails(tmp_path, monkeypatch):
     scripted(monkeypatch, *[Resp(500)] * 2)
     assert io.fetch("https://example.test/x", path, max_age=60, tries=2) == path
     assert path.read_bytes() == b"old"
+
+
+def test_a_body_that_fails_the_check_is_retried_not_cached(tmp_path, monkeypatch):
+    calls = scripted(monkeypatch, Resp(200, b""), Resp(200, b'{"hourly": {}}'))
+    path = tmp_path / "f.json"
+    io.fetch("https://example.test/x", path, check=json.loads)
+    assert json.loads(path.read_bytes()) == {"hourly": {}} and len(calls) == 2
+
+
+def test_a_body_that_keeps_failing_the_check_is_never_written(tmp_path, monkeypatch):
+    scripted(monkeypatch, Resp(200, b""), Resp(200, b"<html>"))
+    with pytest.raises(ValueError, match="unreadable body"):
+        io.fetch("https://example.test/x", tmp_path / "f.json", tries=2, check=json.loads)
+    assert not list(tmp_path.iterdir())
