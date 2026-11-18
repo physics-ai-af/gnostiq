@@ -61,8 +61,9 @@ No test touches the network. Downloads are replaced with stand-ins, and anything
 | `tests/test_requirements.py` | requirements files and Pipfile match pyproject.toml, with pins inside its ranges |
 | `tests/synth.py` | Synthetic raw files in the real formats, used by the fixtures |
 | `tests/test_station.py` | Parsing both sources, NOAA quality flags, trace rain, rain-day rules, station lookup, merge modes |
+| `tests/data/GHCNh_NII0000DNJO_excerpt.psv` | Two rows of the real Jos airport record, with its full header |
 | `tests/test_cli.py` | Argument handling, unknown sources, data directories, helpful errors |
-| `tests/test_gate.py` | Runs the script on a good record, a pinned id, a daytime-only station and an empty lookup |
+| `tests/test_gate.py` | Runs the script on a good record, a pinned id, a station away from the site, a daytime-only station and an empty lookup |
 | `tests/test_nwp.py` | Parsing a real response, chunking, request contents, refused groups, assembly, live fallback |
 | `tests/test_physics.py` | Formulas against known values, the terrain prior, wind sign, rain-day boundaries, fallbacks |
 | `tests/test_precip.py` | File paths, pixel reads, nodata, incremental pulls, preliminary to final, refused days |
@@ -97,7 +98,7 @@ ruff check . && ruff format --check .
 | File | Holds |
 |---|---|
 | `requirements.txt` | What the code needs to run, pinned to the versions the tests passed with |
-| `requirements-dev.txt` | `-r requirements.txt` plus pytest and ruff (and httpx from `15-api-web` on) |
+| `requirements-dev.txt` | `-r requirements.txt` plus pytest and ruff (and httpx2, for the API tests, from `15-api-web` on) |
 
 The second `pip install` puts the `gnostiq` package itself into the environment, which gives you the `gnostiq` command. `--no-deps` stops pip from re-resolving what the requirements file already pinned. A bare `pip install -e .` would skip pytest and ruff, which live in a dependency group pip only reads with `--group dev` on pip 25.1 or newer.
 
@@ -324,10 +325,12 @@ It shares the download cache with `gnostiq pull`, prints a one-line verdict and 
 | Verdict | Meaning | What to set in `gnostiq.toml` |
 |---|---|---|
 | PASS | Good for temperature and for rain | `site.ghcnh`, `truth.temp`, `truth.rain = "station"` |
-| PARTIAL | Temperature is good, the gauge record is not | `truth.temp`, `truth.rain = "chirps"` |
+| PARTIAL | Temperature is good, the gauge record is not | `site.ghcnh` if the temperature comes from GHCNh, `truth.temp`, `truth.rain = "chirps"` |
 | FAIL | No source meets the temperature thresholds | Read the hour-of-day table first |
 
-The report ends with the exact lines to paste into the config.
+The report ends with the keys to change, grouped under `[site]` and `[truth]`. Every one already exists in `gnostiq.toml`, so edit the existing lines rather than pasting a second `[site]` table, which TOML rejects.
+
+If the station reports from more than 1 km away from `site.lat`/`site.lon`, or more than 10 m from `site.elev_m`, the report also gives the station's own coordinates. Use them: the forecast grid cell, the CHIRPS cell and the lapse-rate correction are all read at the configured site, so a site 25 km from the instrument verifies the wrong place.
 
 What it measures:
 
@@ -991,7 +994,7 @@ After setting up with your tool as described under Setup:
 ### Standard Python (`venv` / `virtualenv`)
 
 ```
-python scripts/gate.py  # then copy the suggested lines into gnostiq.toml
+python scripts/gate.py  # then change the keys it lists in gnostiq.toml
 gnostiq pull            # everything; safe to re-run
 gnostiq all             # build, baselines, train, verify, cases
 gnostiq run             # live forecast
@@ -1001,7 +1004,7 @@ gnostiq serve           # http://127.0.0.1:8000
 ### uv
 
 ```
-uv run python scripts/gate.py  # then copy the suggested lines into gnostiq.toml
+uv run python scripts/gate.py  # then change the keys it lists in gnostiq.toml
 uv run gnostiq pull            # everything; safe to re-run
 uv run gnostiq all             # build, baselines, train, verify, cases
 uv run gnostiq run             # live forecast
@@ -1011,7 +1014,7 @@ uv run gnostiq serve           # http://127.0.0.1:8000
 ### Poetry
 
 ```
-poetry run python scripts/gate.py  # then copy the suggested lines into gnostiq.toml
+poetry run python scripts/gate.py  # then change the keys it lists in gnostiq.toml
 poetry run gnostiq pull            # everything; safe to re-run
 poetry run gnostiq all             # build, baselines, train, verify, cases
 poetry run gnostiq run             # live forecast
@@ -1021,7 +1024,7 @@ poetry run gnostiq serve           # http://127.0.0.1:8000
 ### Pipenv
 
 ```
-pipenv run python scripts/gate.py  # then copy the suggested lines into gnostiq.toml
+pipenv run python scripts/gate.py  # then change the keys it lists in gnostiq.toml
 pipenv run gnostiq pull            # everything; safe to re-run
 pipenv run gnostiq all             # build, baselines, train, verify, cases
 pipenv run gnostiq run             # live forecast
@@ -1031,7 +1034,7 @@ pipenv run gnostiq serve           # http://127.0.0.1:8000
 ### Hatch
 
 ```
-hatch run python scripts/gate.py  # then copy the suggested lines into gnostiq.toml
+hatch run python scripts/gate.py  # then change the keys it lists in gnostiq.toml
 hatch run gnostiq pull            # everything; safe to re-run
 hatch run gnostiq all             # build, baselines, train, verify, cases
 hatch run gnostiq run             # live forecast
@@ -1041,7 +1044,7 @@ hatch run gnostiq serve           # http://127.0.0.1:8000
 ### PDM
 
 ```
-pdm run python scripts/gate.py  # then copy the suggested lines into gnostiq.toml
+pdm run python scripts/gate.py  # then change the keys it lists in gnostiq.toml
 pdm run gnostiq pull            # everything; safe to re-run
 pdm run gnostiq all             # build, baselines, train, verify, cases
 pdm run gnostiq run             # live forecast

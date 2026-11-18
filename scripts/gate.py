@@ -127,6 +127,27 @@ def table(df, pct=False):
     return out + [""]
 
 
+def km(lat0, lon0, lat1, lon1):
+    return 111.2 * float(np.hypot(lat1 - lat0, (lon1 - lon0) * np.cos(np.radians(lat0))))
+
+
+def latest(df, cols):
+    # where the station reported from most recently
+    row = df.sort_values("ts").iloc[-1] if "ts" in df else df.iloc[-1]
+    return tuple(float(row[k]) for k in cols)
+
+
+def settings(site, truth):
+    def val(v):
+        return f'"{v}"' if isinstance(v, str) else f"{v:g}"
+
+    out = ["", "Change these keys in gnostiq.toml. Each already exists in its section:", "", "```toml"]
+    for name, kv in (("site", site), ("truth", truth)):
+        if kv:
+            out += [f"[{name}]", *(f"{k} = {val(v)}" for k, v in kv.items()), ""]
+    return out[:-1] + ["```"]
+
+
 def temp_section(name, m):
     mon = m["monthly"].to_frame("c")
     mon["y"], mon["m"] = mon.index.year, mon.index.month
@@ -180,17 +201,22 @@ def main():
         sys.exit(f"IEM has no data for {C.site.icao}: {e}")
     iem = iem.assign(ps=np.nan)
     t_src, p_src = None, None
+    where = {}
+    if len(iem_meta) and {"lat", "lon", "elevation"} <= set(iem_meta):
+        where[C.site.icao] = latest(iem_meta, ["lat", "lon", "elevation"])
 
     for sid in ids:
         raw = station.read_ghcnh(station.ghcnh_path(C, sid), START)
         o = station.tidy_ghcnh(raw)
-        meta = raw.groupby(["Latitude", "Longitude", "Elevation"], dropna=False).ts.agg(["min", "max", "count"])
+        meta = raw.groupby(station.LOC, dropna=False).ts.agg(["min", "max", "count"])
         qc = station.text(raw, "temperature_Quality_Code").replace("", "(blank)").value_counts().to_frame("rows")
         rtypes = station.text(raw, "temperature_Report_Type").replace("", "(blank)").value_counts().to_frame("rows")
         tm, pm = temp_metrics(o), precip_metrics(o)
 
         rep += [f"## GHCNh {sid}", "", "Location history (a change mid-record means the station moved):", ""]
-        rep += table(meta.reset_index().set_index("Latitude"))
+        rep += table(meta.reset_index().set_index("LATITUDE"))
+        if raw[station.LOC].notna().all(axis=1).any():
+            where[sid] = latest(raw.dropna(subset=station.LOC), station.LOC)
         rep += ["Temperature report types:", ""] + table(rtypes)
         rep += ["Temperature QC codes (non-good codes are dropped):", ""] + table(qc)
         rep += temp_section(sid, tm)
@@ -242,26 +268,44 @@ def main():
         t_src = ("iem", C.site.icao)
 
     rep += ["## Gate", ""]
+    site = {}
+    src = p_src or (t_src[1] if t_src else ids[0])
+    if src in where:
+        lat, lon, elev = where[src]
+        d = km(C.site.lat, C.site.lon, lat, lon)
+        if d > 1 or abs(elev - C.site.elev) > 10:
+            rep += [
+                f"{src} reports from {lat:.4f}, {lon:.4f} at {elev:.0f} m, {d:.0f} km from the configured site. "
+                "Forecasts, CHIRPS and the lapse correction are read at the site, so move it to the station.",
+                "",
+            ]
+            site |= {"lat": lat, "lon": lon, "elev_m": elev}
+    if p_src or (t_src and t_src[0] == "ghcnh"):
+        site = {"ghcnh": p_src or t_src[1], **site}
+
     if t_src and p_src:
-        rep.append(f"PASS. Temperature truth: {t_src[1]}. Rain truth: station gauge, cross-checked against CHIRPS v3.")
-        rep += ["", "Set in gnostiq.toml:", "", "```toml", f'site.ghcnh = "{p_src}"', f'truth.temp = "{t_src[0]}"']
-        rep += ['truth.rain = "station"', "```"]
+        verdict = f"PASS. Temperature truth: {t_src[1]}. Rain truth: station gauge, cross-checked against CHIRPS v3."
+        truth = {"temp": t_src[0], "rain": "station"}
     elif t_src:
-        rep.append(
+        verdict = (
             f"PARTIAL. Temperature truth: {t_src[1]}. Rain is verified against CHIRPS v3 only; "
             "rain claims in the demo are skill against satellite estimates, not gauges."
         )
-        rep += ["", "Set in gnostiq.toml:", "", "```toml", f'truth.temp = "{t_src[0]}"', 'truth.rain = "chirps"', "```"]
+        truth = {"temp": t_src[0], "rain": "chirps"}
     else:
-        rep.append(
+        verdict = (
             "FAIL. No source meets the temperature thresholds. Read the hour-of-day profiles above: a station "
             'that only reports by day can still verify daytime hours with truth.temp = "merged", but the claim '
             "narrows to those hours. Otherwise the NiMet record request or an own station is the blocker."
         )
+        truth = {}
+    rep.append(verdict)
+    if site or truth:
+        rep += settings(site, truth)
 
     out = C.paths.reports / "gate.md"
     out.write_text("\n".join(rep) + "\n")
-    print(rep[rep.index("## Gate") + 2])
+    print(verdict)
     print(f"report: {out}")
 
 

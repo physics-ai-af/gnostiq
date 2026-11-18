@@ -12,6 +12,30 @@ Z_MODEL = 1000.0
 NULL_IN_ARCHIVE = {"f_cape", "f_tcwv"}
 
 
+# column order of a real GHCNh .psv (NII0000DNJO, Nov 2026)
+GHCNH_VARS = [
+    "temperature", "dew_point_temperature", "station_level_pressure", "sea_level_pressure", "wind_direction",
+    "wind_speed", "wind_gust", "precipitation", "relative_humidity", "wet_bulb_temperature",
+    *[f"pres_wx_{k}{i}" for k in ("MW", "AU", "AW") for i in (1, 2, 3)],
+    "snow_depth", "visibility", "altimeter", "pressure_3hr_change", "sky_condition", "sky_condition_baseht",
+    "ceiling_height",
+    *[f"sky_cover_{k}_{i}" for k in ("layer", "layer_baseht", "summation", "summation_baseht") for i in (1, 2, 3, 4)],
+    *[f"precipitation_{k}" for k in ("5_minute", "15_minute", "3_hour", "6_hour", "9_hour", "12_hour", "15_hour",
+                                     "18_hour", "21_hour", "24_hour")],
+    "REM",
+]  # fmt: skip
+GHCNH_HEAD = [
+    "STATION", "Station_name", "DATE", "Year", "Month", "Day", "Hour", "Minute", "LATITUDE", "LONGITUDE", "ELEVATION",
+    *[v + s for v in GHCNH_VARS for s in ("", "_Measurement_Code", "_Quality_Code", "_Report_Type", "_Source_Code",
+                                           "_Source_Station_ID")],
+]  # fmt: skip
+
+
+def ghcnh_psv(path, rows, drop=()):
+    head = [k for k in GHCNH_HEAD if k not in drop]
+    pd.DataFrame(rows).reindex(columns=head).to_csv(path, sep="|", index=False, na_rep="")
+
+
 def ar1(rng, n, phi, sd):
     e = rng.normal(0, sd * np.sqrt(1 - phi**2), n)
     x = np.empty(n)
@@ -56,12 +80,14 @@ def write_station(c, tru, rng, day_only=False):
     s = s[rng.random(len(s)) > 0.06].reset_index(drop=True)
     n = len(s)
     t = (s.t + rng.normal(0, 0.3, n)).round(1)
+    v = s.valid.dt
     psv = pd.DataFrame(
         {
-            "Station_ID": "NIM00065134", "Station_name": "JOS", "DATE": s.valid.dt.strftime("%Y-%m-%dT%H:%M:%S"),
-            "Latitude": c.site.lat, "Longitude": c.site.lon, "Elevation": c.site.elev,
+            "STATION": "NIM00065134", "Station_name": "JOS", "DATE": v.strftime("%Y-%m-%dT%H:%M:%S"),
+            "Year": v.year, "Month": v.strftime("%m"), "Day": v.strftime("%d"), "Hour": v.strftime("%H"),
+            "Minute": "00", "LATITUDE": c.site.lat, "LONGITUDE": c.site.lon, "ELEVATION": c.site.elev,
             "temperature": t, "temperature_Measurement_Code": "", "temperature_Quality_Code": "5",
-            "temperature_Report_Type": "FM-12",
+            "temperature_Report_Type": "FM12",
             "dew_point_temperature": np.minimum(t, (s.td + rng.normal(0, 0.4, n)).round(1)),
             "dew_point_temperature_Quality_Code": "5",
             "station_level_pressure": (871.5 + rng.normal(0, 1.5, n)).round(1),
@@ -70,7 +96,7 @@ def write_station(c, tru, rng, day_only=False):
         }
     )  # fmt: skip
     psv.loc[5, "temperature"] = 61.0  # one gross error for QC to catch
-    psv.to_csv(d / "GHCNh_NIM00065134_por.psv", sep="|", index=False, na_rep="")
+    ghcnh_psv(d / "GHCNh_NIM00065134_por.psv", psv)
 
     m = tru[tru.valid.dt.hour.between(7, 17)]
     for y, g in m.groupby(m.valid.dt.year):

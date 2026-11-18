@@ -26,6 +26,7 @@ COLS = {
     "p12": "precipitation_12_hour",
     "p24": "precipitation_24_hour",
 }
+LOC = ["LATITUDE", "LONGITUDE", "ELEVATION"]
 RAIN = ("p6", "p12", "p24")
 OBS = ["t", "td", "ps", "slp", "qnh", "wspd", *RAIN]
 DAY = 86400
@@ -93,9 +94,13 @@ def ghcnh_path(c, sid, refresh=False):
 
 
 def read_ghcnh(path, start):
-    keep = {"DATE", "Year", "Month", "Day", "Hour", "Minute", "Latitude", "Longitude", "Elevation"}
+    keep = {"DATE", "Year", "Month", "Day", "Hour", "Minute", *LOC}
     stems = tuple(COLS.values())
     df = pd.read_csv(path, sep="|", dtype=str, usecols=lambda k: k in keep or k.startswith(stems), low_memory=False)
+    # a renamed column would otherwise come through as all missing
+    gone = [k for k in [*LOC, *COLS.values()] if k not in df]
+    if gone:
+        raise ValueError(f"{path.name} has no {', '.join(gone)} column; the GHCNh format may have changed")
     if "DATE" in df:
         ts = pd.to_datetime(df["DATE"], utc=True)
     else:
