@@ -60,6 +60,33 @@ def test_run_writes_the_document_atomically(trained, monkeypatch):
     path = c.paths.reports / "forecast.json"
     assert json.loads(path.read_text()) == doc and not list(c.paths.reports.glob("*.part"))
     assert doc["hourly"] and doc["site"]["name"] == c.site.name
+    saved = pd.read_parquet(c.paths.archive / f"{pd.Timestamp(doc['init_utc'].rstrip('Z')):%Y%m%dT%H}.parquet")
+    assert saved.equals(run.issued(doc))
+
+
+def test_the_forecast_carries_other_models_and_the_normal_range(trained):
+    c = trained
+    doc = run.forecast(c, synth.live_frame(c, INIT), INIT, live_extras(c, INIT))
+    m = c.nwp.extra[0]
+    first = doc["hourly"][0]
+    assert set(first["models"]) == {m} and first["models"][m]["t2m"] is not None
+    for var in ("t2m", "td2m"):
+        q = first["clim"][var]
+        assert q["q10"] < q["q50"] < q["q90"]
+    assert all(set(s["models"]) == {m} for s in doc["hourly"])
+
+
+def test_issued_rows_are_what_the_page_shows(trained):
+    c = trained
+    doc = run.forecast(c, synth.live_frame(c, INIT), INIT, live_extras(c, INIT))
+    t = run.issued(doc)
+    m = c.nwp.extra[0]
+    assert set(t.system) == {"gnostiq", "raw", f"raw:{m}", "clim"} and set(t["var"]) == {"t2m", "td2m"}
+    assert len(t) == 2 * 4 * len(doc["hourly"]) and (t.init == INIT).all()
+    first = doc["hourly"][0]
+    g = t[(t.system == "gnostiq") & (t["var"] == "t2m")].iloc[0]
+    assert g.mu == first["t2m"]["q50"] and g.sigma > 0
+    assert t[t.system.str.startswith("raw")].sigma.isna().all()
 
 
 def test_extra_models_feed_the_forecast_and_a_missing_one_is_survivable(trained):

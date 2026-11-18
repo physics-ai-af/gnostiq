@@ -105,8 +105,12 @@ class Paths:
     def reports(self):
         return self.data / "reports"
 
+    @property
+    def archive(self):
+        return self.data / "archive"
+
     def ensure(self):
-        for p in (self.raw, self.interim, self.processed, self.models, self.reports):
+        for p in (self.raw, self.interim, self.processed, self.models, self.reports, self.archive):
             p.mkdir(parents=True, exist_ok=True)
 
 

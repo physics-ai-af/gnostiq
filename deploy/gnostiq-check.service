@@ -1,0 +1,10 @@
+[Unit]
+Description=Gnostiq live check against new airport reports
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=gnostiq
+WorkingDirectory=/opt/gnostiq/app
+ExecStart=/opt/gnostiq/app/.venv/bin/gnostiq check

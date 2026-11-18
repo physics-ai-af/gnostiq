@@ -6,7 +6,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-from gnostiq import dist, model, physics
+from gnostiq import baselines, dist, model, physics
 from gnostiq.ingest import nwp, static
 
 log = logging.getLogger("gnostiq")
@@ -15,6 +15,19 @@ log = logging.getLogger("gnostiq")
 def lead_days(valid, init):
     # archived day-N leads are >= 24N h, so round up
     return np.maximum(np.ceil(np.asarray((valid - init) / pd.Timedelta(hours=24))).astype(int), 1)
+
+
+def normal(c, valid):
+    # the usual weather for that hour and date, from the station record
+    path = c.paths.interim / "obs.parquet"
+    if not path.exists():
+        return {}
+    obs = pd.read_parquet(path).rename(columns={"t": "o_t2m", "td": "o_td2m"})
+    return {var: baselines.clim_hourly(c, obs, ocol, valid) for var, (ocol, _, _) in baselines.HVARS.items()}
+
+
+def value(x):
+    return None if x is None or not np.isfinite(x) else round(float(x), 1)
 
 
 def forecast(c, frame, init, extras=None):
@@ -39,13 +52,23 @@ def forecast(c, frame, init, extras=None):
     t = band(t_mu, t_sig)
     # td <= t, quantile by quantile
     td = band(td_mu, td_sig, cap=t)
-    hourly = [
-        {"valid_utc": v.strftime("%Y-%m-%dT%H:%MZ"), "lead_day": int(ld),
-         "t2m": {"q10": float(t[0][i]), "q50": float(t[1][i]), "q90": float(t[2][i])},
-         "td2m": {"q10": float(td[0][i]), "q50": float(td[1][i]), "q90": float(td[2][i])},
-         "raw": {"t2m": round(float(fut.f_t2m[i]), 1), "td2m": round(float(fut.f_td2m[i]), 1)}}
-        for i, (v, ld) in enumerate(zip(fut.valid, fut.lead_day, strict=True))
-    ]  # fmt: skip
+    clim = {var: band(*ms) for var, ms in normal(c, fut.valid).items()}
+    others = [m for m in (extras or {}) if f"x_{m}_dt2m" in fut]
+
+    def q(b, i):
+        return {"q10": float(b[0][i]), "q50": float(b[1][i]), "q90": float(b[2][i])}
+
+    hourly = []
+    for i, (v, ld) in enumerate(zip(fut.valid, fut.lead_day, strict=True)):
+        step = {
+            "valid_utc": v.strftime("%Y-%m-%dT%H:%MZ"), "lead_day": int(ld), "t2m": q(t, i), "td2m": q(td, i),
+            "raw": {"t2m": round(float(fut.f_t2m[i]), 1), "td2m": round(float(fut.f_td2m[i]), 1)},
+            "models": {m: {"t2m": value(fut.f_t2m[i] + fut[f"x_{m}_dt2m"][i]),
+                           "td2m": value(fut.f_td2m[i] + fut[f"x_{m}_dtd2m"][i])} for m in others},
+        }  # fmt: skip
+        if clim:
+            step["clim"] = {var: q(b, i) for var, b in clim.items()}
+        hourly.append(step)
 
     h0 = c.truth.rain_h0
     d = physics.daily_features(h, h0, keys=())
@@ -78,6 +101,27 @@ def forecast(c, frame, init, extras=None):
     }
 
 
+def issued(doc):
+    # what the page showed, one row per system, variable and hour; the live check scores exactly this
+    init = pd.Timestamp(doc["init_utc"].rstrip("Z"))
+    rows = []
+    for s in doc["hourly"]:
+        valid = pd.Timestamp(s["valid_utc"].rstrip("Z"))
+        for var in ("t2m", "td2m"):
+            got = [("gnostiq", s[var]), ("raw", s["raw"][var])]
+            got += [(f"raw:{m}", x[var]) for m, x in s["models"].items()]
+            if "clim" in s:
+                got.append(("clim", s["clim"][var]))
+            for system, x in got:
+                if isinstance(x, dict):
+                    mu, sigma = x["q50"], (x["q90"] - x["q10"]) / (2 * dist.Z80)
+                else:
+                    mu, sigma = x, np.nan
+                if mu is not None:
+                    rows.append((init, valid, s["lead_day"], var, system, mu, sigma))
+    return pd.DataFrame(rows, columns=["init", "valid", "lead_day", "var", "system", "mu", "sigma"])
+
+
 def run(c):
     frame, _ = nwp.live(c)
     init = pd.Timestamp.now("UTC").tz_localize(None).floor("h")
@@ -87,5 +131,7 @@ def run(c):
     tmp = path.with_name(path.name + ".part")
     tmp.write_text(json.dumps(doc))
     tmp.replace(path)
+    c.paths.archive.mkdir(parents=True, exist_ok=True)
+    issued(doc).to_parquet(c.paths.archive / f"{init:%Y%m%dT%H}.parquet", index=False)
     log.info("forecast: %d hourly steps, %d days, init %s", len(doc["hourly"]), len(doc["daily"]), doc["init_utc"])
     return doc
