@@ -27,7 +27,20 @@ def test_good_temperature_record_without_gauge_is_partial(station_raw):
     for part in ("## GHCNh records near the site", "## GHCNh NIM00065134", "Location history",
                  "Monthly synoptic-slot coverage", "barometer elevation", "vs DNJO METAR", "## Gate"):  # fmt: skip
         assert part in text, part
-    assert 'truth.temp = "ghcnh"' in text and 'truth.rain = "chirps"' in text
+    assert '[site]\nghcnh = "NIM00065134"\n\n[truth]\ntemp = "ghcnh"\nrain = "chirps"\n```' in text
+    assert "from the configured site" not in text
+
+
+def test_suggests_moving_the_site_onto_the_station(tmp_path):
+    c = cfg.load(write_cfg(tmp_path, SMALL))
+    tru, _ = synth.truth(c, SYNTH_END)
+    synth.write_station(c, tru, np.random.default_rng(1))
+    c = cfg.load(write_cfg(tmp_path, {**SMALL, "lat = 9.8667": "lat = 10.0667"}))
+    r, report = gate(c)
+    assert r.returncode == 0, r.stderr
+    text = report.read_text()
+    assert "reports from 9.8667, 8.9000 at 1295 m, 22 km from the configured site" in text
+    assert '[site]\nghcnh = "NIM00065134"\nlat = 9.8667\nlon = 8.9\nelev_m = 1295\n' in text
 
 
 def test_station_id_can_be_pinned(station_raw):

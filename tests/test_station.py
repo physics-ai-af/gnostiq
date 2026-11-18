@@ -1,13 +1,17 @@
 from dataclasses import replace
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
+import synth
 from conftest import write_cfg
 
 from gnostiq import cfg
 from gnostiq.ingest import station
 from gnostiq.io import Missing
+
+DATA = Path(__file__).parent / "data"
 
 
 def obs(rows):
@@ -51,10 +55,10 @@ def ghcnh_rows(**cols):
 
 def test_tidy_drops_values_that_failed_noaa_checks():
     df = ghcnh_rows(temperature=["20.1", "21.0", "22.5"], temperature_Quality_Code=["5", "3", ""],
-                    temperature_Report_Type=["FM-12", "FM-12", "FM-15"])  # fmt: skip
+                    temperature_Report_Type=["FM12", "FM12", "FM15"])  # fmt: skip
     o = station.tidy_ghcnh(df)
     assert o.t.tolist()[0] == 20.1 and np.isnan(o.t.iloc[1]) and o.t.iloc[2] == 22.5
-    assert o.rtype.tolist() == ["FM-12", "FM-12", "FM-15"]
+    assert o.rtype.tolist() == ["FM12", "FM12", "FM15"]
 
 
 def test_tidy_reads_trace_rain_as_zero_but_leaves_pressure_alone():
@@ -73,14 +77,33 @@ def test_tidy_fills_absent_columns_with_nan():
 
 @pytest.mark.parametrize("stamp", ["single", "split"])
 def test_read_ghcnh_accepts_both_timestamp_layouts(tmp_path, stamp):
-    if stamp == "single":
-        head, rows = "DATE|temperature", ["2020-12-31T21:00:00|18.0", "2021-01-01T00:00:00|19.0"]
-    else:
-        head, rows = "Year|Month|Day|Hour|Minute|temperature", ["2020|12|31|21|0|18.0", "2021|1|1|0|0|19.0"]
+    rows = [
+        {"DATE": "2020-12-31T21:00:00", "Year": 2020, "Month": 12, "Day": 31, "Hour": 21, "temperature": 18.0},
+        {"DATE": "2021-01-01T00:00:00", "Year": 2021, "Month": 1, "Day": 1, "Hour": 0, "temperature": 19.0},
+    ]  # fmt: skip
+    rows = [{**r, "Minute": 0} for r in rows]
     path = tmp_path / "g.psv"
-    path.write_text("\n".join([head, *rows]) + "\n")
+    synth.ghcnh_psv(path, rows, drop=["DATE"] if stamp == "split" else [])
     df = station.read_ghcnh(path, "2021-01-01")
     assert df.ts.tolist() == [pd.Timestamp("2021-01-01 00:00")] and df.temperature.tolist() == ["19.0"]
+
+
+def test_reads_rows_from_the_real_jos_record():
+    raw = station.read_ghcnh(DATA / "GHCNh_NII0000DNJO_excerpt.psv", "2021-01-01")
+    o = station.tidy_ghcnh(raw)
+    assert o.index.tolist() == [pd.Timestamp("2026-08-19 16:00"), pd.Timestamp("2026-08-20 13:00")]
+    # the METARs in the REM column: 24/21 Q1020 28008KT, then 28/21 Q1020 02004KT
+    assert o.t.tolist() == [24.0, 28.0] and o.td.tolist() == [21.0, 21.0]
+    assert o.qnh.tolist() == [1020.0, 1020.0] and o.wspd.tolist() == [4.1, 2.1]
+    assert o.rtype.tolist() == ["FM15", "FM15"] and o.ps.isna().all() and o.p6.isna().all()
+    assert raw[station.LOC].drop_duplicates().values.tolist() == [["9.6398", "8.8691", "1289.9"]]
+
+
+def test_read_ghcnh_stops_on_a_header_it_does_not_know(tmp_path):
+    path = tmp_path / "g.psv"
+    path.write_text("DATE|Latitude|Longitude|Elevation|temperature\n2021-01-01T00:00:00|9.6|8.9|1290|19.0\n")
+    with pytest.raises(ValueError, match="no LATITUDE, LONGITUDE, ELEVATION, dew_point_temperature"):
+        station.read_ghcnh(path, "2021-01-01")
 
 
 def test_read_iem_converts_units_and_missing_markers(tmp_path):
