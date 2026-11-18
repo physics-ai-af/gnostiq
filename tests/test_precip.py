@@ -63,6 +63,7 @@ def chc(tmp_path, monkeypatch):
         return {"day": day, "pt": 1.0, "tp24": 2.0 if stage == "final" else 9.0, "stage": stage}
 
     monkeypatch.setattr(precip, "one", one)
+    monkeypatch.setattr(precip, "PAUSE", 0)
     return c, state
 
 
@@ -98,3 +99,24 @@ def test_pull_retries_days_the_server_refused(chc):
     state["calls"].clear()
     second = precip.pull(c)
     assert set(state["calls"]) == gone and second.day.isin(gone).sum() == 2
+
+
+def test_pull_reads_the_forecast_years_first(tmp_path, monkeypatch):
+    edits = {
+        "start = 2021-01-01": "start = 2025-01-01",
+        "start = 2024-01-01": "start = 2025-06-01",
+        "train_end = 2026-03-31": "train_end = 2025-12-31",
+    }
+    c = cfg.load(write_cfg(tmp_path, edits))
+    calls = []
+
+    def one(day, lat, lon, flavor):
+        calls.append(day)
+        return {"day": day, "pt": 1.0, "tp24": 1.0, "stage": "final"}
+
+    monkeypatch.setattr(precip, "one", one)
+    monkeypatch.setattr(precip, "PAUSE", 0)
+    out = precip.pull(c)
+    cut = pd.Timestamp("2025-06-01")
+    assert calls[0] == cut and calls == sorted(calls, key=lambda d: (d < cut, d))
+    assert out.day.is_monotonic_increasing and not list(precip.cache(c).parent.glob("*.part"))

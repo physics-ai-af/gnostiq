@@ -480,7 +480,7 @@ The series is kept in `data/raw/chirps/chirps_<flavor>.parquet` with columns `da
 
 - `truth.chirps_flavor = "sat"` takes its day-to-day timing from IMERG satellite estimates, `"rnl"` from ERA5. `sat` is the default because ERA5 is itself an ECMWF product, and scoring an ECMWF forecast against ECMWF-timed rain would flatter it.
 - Recent days come from the preliminary product until the final one is published, around the third week of the following month. Preliminary days are read again on every pull and replaced when the final file appears.
-- The server rate-limits. One test request came back with a 429. A day it refuses is not stored, so the next pull tries it again. Re-run until the log says `0 not read`. The first full pull is about 2,100 small reads and can take 20 to 60 minutes.
+- The server rate-limits, and answers 429 to readers that go too fast. The pull reads one day at a time with a one-second pause, and the days the model trains and tests on (from `nwp.start`) come first, so a stopped run still leaves those on file. A day it refuses is not stored, so the next pull tries it again. Re-run until the log says `0 not read`. The first full pull is about 2,100 small reads and takes roughly an hour.
 
 On a plain `gnostiq pull`, CHIRPS is skipped when `truth.rain = "station"`. Name it with `--only precip` to fetch it anyway.
 

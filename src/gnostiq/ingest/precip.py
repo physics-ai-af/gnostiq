@@ -1,7 +1,7 @@
 """CHIRPS v3 daily rain at the site."""
 
 import logging
-from concurrent.futures import ThreadPoolExecutor
+import time
 
 import numpy as np
 import pandas as pd
@@ -15,10 +15,12 @@ BASE = "https://data.chc.ucsb.edu/products/CHIRPS/v3.0/daily"
 GDAL = {
     "GDAL_DISABLE_READDIR_ON_OPEN": "EMPTY_DIR",
     "CPL_VSIL_CURL_ALLOWED_EXTENSIONS": ".tif",
-    "GDAL_HTTP_MAX_RETRY": "3",
-    "GDAL_HTTP_RETRY_DELAY": "3",
+    "CPL_VSIL_CURL_USE_HEAD": "NO",  # one request fewer per file
+    "GDAL_HTTP_MAX_RETRY": "5",
+    "GDAL_HTTP_RETRY_DELAY": "10",
     "GDAL_HTTP_TIMEOUT": "60",
 }
+PAUSE = 1.0  # seconds between days; CHC answers 429 to faster readers
 
 
 def url(day, flavor, stage):
@@ -63,17 +65,21 @@ def pull(c, refresh=False):
     todo = want.difference(pd.DatetimeIndex(have.day[have.stage == "final"]))
     if len(todo) == 0:
         return have
+    # forecast years first, so a stopped run still leaves the model's days on file
+    cut = pd.Timestamp(c.nwp.start)
+    todo = todo[todo >= cut].append(todo[todo < cut])
     log.info("chirps: reading %d days", len(todo))
 
     rows = []
-    with rasterio.Env(**GDAL), ThreadPoolExecutor(2) as ex:
-        jobs = ex.map(lambda d: one(d, c.site.lat, c.site.lon, c.truth.chirps_flavor), todo)
-        for n, r in enumerate(jobs, 1):
+    with rasterio.Env(**GDAL):
+        for n, day in enumerate(todo, 1):
+            r = one(day, c.site.lat, c.site.lon, c.truth.chirps_flavor)
             if r:
                 rows.append(r)
             if n % 200 == 0:
                 log.info("chirps: %d/%d", n, len(todo))
                 save(path, have, rows)
+            time.sleep(PAUSE)
     out = save(path, have, rows)
     log.info("chirps: %d days on file, %d not read (re-run to retry)", len(out), len(todo) - len(rows))
     return out
@@ -84,5 +90,8 @@ def save(path, have, rows):
     out = pd.concat([have[~have.day.isin(new.day)], new], ignore_index=True) if len(have) else new
     out = out.sort_values("day").reset_index(drop=True)
     path.parent.mkdir(parents=True, exist_ok=True)
-    out.to_parquet(path, index=False)
+    # Ctrl+C mid-write must not leave a broken cache
+    tmp = path.with_name(path.name + ".part")
+    out.to_parquet(tmp, index=False)
+    tmp.replace(path)
     return out
