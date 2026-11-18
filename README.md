@@ -1151,6 +1151,7 @@ The pipeline runs end to end and every test passes, on synthetic data. No real-d
 | `pull` stops with a 400 on the core group | Open-Meteo rejected a variable or the model id. The message quotes the server's reason. Fix the id in `gnostiq.toml` or the name in `GROUPS` in `ingest/nwp.py`. |
 | Warning `variable group 'levels' not served` | Expected. A `levels.missing` marker stops further attempts; `--refresh` tries again. |
 | 429 or repeated retries | Rate limit. Wait, then re-run; finished downloads are skipped. |
+| `removed N unreadable forecast chunk(s)` from `gnostiq all` | A download came back empty or cut off. Run `gnostiq pull --only nwp`, which fetches just those chunks, then `gnostiq all`. |
 | `N GHCNh candidates ...` | Several station records match. Run the gate and set `site.ghcnh`. |
 | CHIRPS log says many days not read | Usually the rate limit; re-run. If every read fails, open one URL from `precip.url()` in a browser. |
 | `pairs have no train or no test rows` | The windows do not overlap the data. Check the last observation date in `data/reports/gate.md`. |

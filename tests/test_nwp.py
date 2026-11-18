@@ -1,3 +1,5 @@
+import shutil
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -75,6 +77,15 @@ def test_pull_requests_every_lead_for_every_variable(archive):
     assert {g for m, g, _ in calls if m != "ecmwf_ifs025"} == {"core"}
 
 
+def test_pull_refetches_unreadable_chunks(archive):
+    c, _, _ = archive
+    broken = c.paths.raw / "nwp" / c.nwp.base / "core_2024-01-01_2024-04-01.json"
+    broken.parent.mkdir(parents=True)
+    broken.write_text("")
+    nwp.pull(c)
+    assert nwp.unreadable(c) == [] and broken.read_text() == "{}"
+
+
 def test_pull_skips_a_refused_group_after_one_attempt(archive):
     c, calls, refuse = archive
     refuse.add(("ecmwf_ifs025", "levels"))
@@ -115,6 +126,16 @@ def test_build_assembles_one_row_per_valid_time_and_lead(nwp_raw):
     assert "f_t850" not in df or df.f_t850.isna().all()
     extra = pd.read_parquet(c.paths.interim / f"nwp_{c.nwp.extra[0]}.parquet")
     assert "f_sw" not in extra
+
+
+def test_build_removes_unreadable_chunks_and_says_what_to_run(nwp_raw, tmp_path):
+    c = cfg.load(write_cfg(tmp_path))
+    shutil.copytree(nwp_raw.paths.raw / "nwp", c.paths.raw / "nwp")
+    good = sorted((c.paths.raw / "nwp").glob("*/*.json"))
+    good[0].write_text("")
+    with pytest.raises(RuntimeError, match=r"removed 1 unreadable .*gnostiq pull --only nwp"):
+        nwp.build(c)
+    assert not good[0].exists() and all(p.exists() for p in good[1:])
 
 
 def test_build_without_chunks_says_what_to_run(tmp_path):

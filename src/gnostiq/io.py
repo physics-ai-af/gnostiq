@@ -14,7 +14,7 @@ class Missing(Exception):
     pass
 
 
-def fetch(url, path, params=None, max_age=None, tries=4, timeout=600):
+def fetch(url, path, params=None, max_age=None, tries=4, timeout=600, check=None):
     path = Path(path)
     if path.exists() and (max_age is None or time.time() - path.stat().st_mtime < max_age):
         return path
@@ -29,11 +29,19 @@ def fetch(url, path, params=None, max_age=None, tries=4, timeout=600):
             if r.status_code in (400, 404):
                 raise Missing(f"{r.status_code} {r.url}: {r.text[:300]}")
             if r.ok:
-                tmp = path.with_name(path.name + ".part")
-                tmp.write_bytes(r.content)
-                tmp.replace(path)
-                return path
-            err = requests.HTTPError(f"{r.status_code} {r.url}: {r.text[:200]}")
+                try:
+                    if check:
+                        check(r.content)
+                except ValueError as e:
+                    # flaky links have returned 200 with an empty or cut-off body
+                    err = ValueError(f"unreadable body from {r.url}: {e}")
+                else:
+                    tmp = path.with_name(path.name + ".part")
+                    tmp.write_bytes(r.content)
+                    tmp.replace(path)
+                    return path
+            else:
+                err = requests.HTTPError(f"{r.status_code} {r.url}: {r.text[:200]}")
         if i < tries - 1:
             wait = 20 * 2**i
             log.warning("fetch failed (%s); retry in %ss", err, wait)
