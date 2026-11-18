@@ -134,7 +134,13 @@ def km(lat0, lon0, lat1, lon1):
 def latest(df, cols):
     # where the station reported from most recently
     row = df.sort_values("ts").iloc[-1] if "ts" in df else df.iloc[-1]
-    return tuple(float(row[k]) for k in cols)
+    return tuple(str(row[k]).strip() for k in cols)
+
+
+def places(x):
+    # 9.25, 7.0 in a synop record is a rough position; 9.0068, 7.2632 is surveyed
+    frac = x.split(".")[1] if "." in x else ""
+    return len(frac.rstrip("0"))
 
 
 def settings(site, truth):
@@ -201,6 +207,7 @@ def main():
         sys.exit(f"IEM has no data for {C.site.icao}: {e}")
     iem = iem.assign(ps=np.nan)
     t_src, p_src = None, None
+    twins = set()  # GHCNh records that read the same thermometer as the METAR
     where = {}
     if len(iem_meta) and {"lat", "lon", "elevation"} <= set(iem_meta):
         where[C.site.icao] = latest(iem_meta, ["lat", "lon", "elevation"])
@@ -253,6 +260,8 @@ def main():
                 f"{' (n < 200, inconclusive)' if co['n'] < 200 else ''}",
                 "",
             ]
+            if same and co["n"] >= 200:
+                twins.add(sid)
         else:
             rep += ["- no coincident synop/METAR hours", ""]
 
@@ -270,13 +279,19 @@ def main():
     rep += ["## Gate", ""]
     site = {}
     src = p_src or (t_src[1] if t_src else ids[0])
-    if src in where:
-        lat, lon, elev = where[src]
+    # records of one instrument can disagree on where it is; trust the most precise
+    pool = [src, C.site.icao, *twins] if src in twins or src == C.site.icao else [src]
+    pool = [k for k in dict.fromkeys(pool) if k in where]
+    if pool:
+        best = max(pool, key=lambda k: min(places(where[k][0]), places(where[k][1])))
+        lat, lon, elev = (float(x) for x in where[best])
         d = km(C.site.lat, C.site.lon, lat, lon)
         if d > 1 or abs(elev - C.site.elev) > 10:
+            note = "" if best == src else f" {src} reads the same instrument but lists a rougher position."
             rep += [
-                f"{src} reports from {lat:.4f}, {lon:.4f} at {elev:.0f} m, {d:.0f} km from the configured site. "
-                "Forecasts, CHIRPS and the lapse correction are read at the site, so move it to the station.",
+                f"{best} puts the station at {lat:.4f}, {lon:.4f}, {elev:.0f} m, {d:.0f} km from the configured "
+                f"site.{note} Forecasts, CHIRPS and the lapse correction are read at the site, so move it to the "
+                "station.",
                 "",
             ]
             site |= {"lat": lat, "lon": lon, "elev_m": elev}

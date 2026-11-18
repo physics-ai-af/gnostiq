@@ -10,7 +10,7 @@ Use the block for your tool.
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 pytest                         # everything
 python -m pytest               # everything, explicit interpreter
 pytest tests/test_pipeline.py  # one file
@@ -18,35 +18,35 @@ pytest tests/test_pipeline.py  # one file
 
 ### uv
 
-```
+```bash
 uv run pytest                         # everything
 uv run pytest tests/test_pipeline.py  # one file
 ```
 
 ### Poetry
 
-```
+```bash
 poetry run pytest                         # everything
 poetry run pytest tests/test_pipeline.py  # one file
 ```
 
 ### Pipenv
 
-```
+```bash
 pipenv run pytest                         # everything
 pipenv run pytest tests/test_pipeline.py  # one file
 ```
 
 ### Hatch
 
-```
+```bash
 hatch run pytest                         # everything
 hatch run pytest tests/test_pipeline.py  # one file
 ```
 
 ### PDM
 
-```
+```bash
 pdm run pytest                         # everything
 pdm run pytest tests/test_pipeline.py  # one file
 ```
@@ -56,6 +56,7 @@ No test touches the network. Downloads are replaced with stand-ins, and anything
 | Path | What it checks |
 |---|---|
 | `tests/conftest.py` | Shared fixtures: config writer, and from later branches the staged synthetic data |
+| `tests/data/gnostiq.toml` | Frozen copy of the Jos config that the fixtures edit, so changing site leaves the tests alone |
 | `tests/test_cfg.py` | Config loading, lookup order, and every validation rule |
 | `tests/test_io.py` | Caching, refresh by age, retries, missing files, fallback to a stale copy |
 | `tests/test_requirements.py` | requirements files and Pipfile match pyproject.toml, with pins inside its ranges |
@@ -86,7 +87,7 @@ You need Python 3.12 or newer. There are no API keys and no accounts. Each block
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 python -m venv .venv                   # or: virtualenv .venv
 source .venv/bin/activate              # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
@@ -106,7 +107,7 @@ The requirements files list direct dependencies only, so pip still picks version
 
 ### uv
 
-```
+```bash
 uv sync
 uv run pytest
 uv run ruff check . && uv run ruff format --check .
@@ -116,7 +117,7 @@ uv run ruff check . && uv run ruff format --check .
 
 ### Poetry
 
-```
+```bash
 poetry install
 poetry run pytest
 poetry run ruff check . && poetry run ruff format --check .
@@ -126,7 +127,7 @@ Poetry reads the standard `[project]` and `[dependency-groups]` tables, so there
 
 ### Pipenv
 
-```
+```bash
 pipenv install --dev
 pipenv run pytest
 pipenv run ruff check . && pipenv run ruff format --check .
@@ -136,7 +137,7 @@ Pipenv does not read `pyproject.toml`. It reads the `Pipfile`, which carries the
 
 ### Hatch
 
-```
+```bash
 hatch env create
 hatch run pytest
 hatch run ruff check . && hatch run ruff format --check .
@@ -146,7 +147,7 @@ hatch run ruff check . && hatch run ruff format --check .
 
 ### PDM
 
-```
+```bash
 pdm install
 pdm run pytest
 pdm run ruff check . && pdm run ruff format --check .
@@ -211,42 +212,42 @@ Run the ingestion with the block for your tool:
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 gnostiq pull   # download both into data/raw/station/
 gnostiq build  # parse and merge into data/interim/
 ```
 
 ### uv
 
-```
+```bash
 uv run gnostiq pull   # download both into data/raw/station/
 uv run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### Poetry
 
-```
+```bash
 poetry run gnostiq pull   # download both into data/raw/station/
 poetry run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### Pipenv
 
-```
+```bash
 pipenv run gnostiq pull   # download both into data/raw/station/
 pipenv run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### Hatch
 
-```
+```bash
 hatch run gnostiq pull   # download both into data/raw/station/
 hatch run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### PDM
 
-```
+```bash
 pdm run gnostiq pull   # download both into data/raw/station/
 pdm run gnostiq build  # parse and merge into data/interim/
 ```
@@ -280,42 +281,42 @@ Run this before any modelling. It answers one question: is the Jos record good e
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 python scripts/gate.py              # looks the station up by WMO number
 python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### uv
 
-```
+```bash
 uv run python scripts/gate.py              # looks the station up by WMO number
 uv run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### Poetry
 
-```
+```bash
 poetry run python scripts/gate.py              # looks the station up by WMO number
 poetry run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### Pipenv
 
-```
+```bash
 pipenv run python scripts/gate.py              # looks the station up by WMO number
 pipenv run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### Hatch
 
-```
+```bash
 hatch run python scripts/gate.py              # looks the station up by WMO number
 hatch run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### PDM
 
-```
+```bash
 pdm run python scripts/gate.py              # looks the station up by WMO number
 pdm run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
@@ -348,42 +349,42 @@ Past forecasts for the Jos grid cell, from Open-Meteo's Previous Runs API. For e
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 gnostiq pull --only nwp
 gnostiq build
 ```
 
 ### uv
 
-```
+```bash
 uv run gnostiq pull --only nwp
 uv run gnostiq build
 ```
 
 ### Poetry
 
-```
+```bash
 poetry run gnostiq pull --only nwp
 poetry run gnostiq build
 ```
 
 ### Pipenv
 
-```
+```bash
 pipenv run gnostiq pull --only nwp
 pipenv run gnostiq build
 ```
 
 ### Hatch
 
-```
+```bash
 hatch run gnostiq pull --only nwp
 hatch run gnostiq build
 ```
 
 ### PDM
 
-```
+```bash
 pdm run gnostiq pull --only nwp
 pdm run gnostiq build
 ```
@@ -441,37 +442,37 @@ When the station gauge is not usable, daily rain truth comes from CHIRPS v3. The
 
 #### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 gnostiq pull --only precip
 ```
 
 #### uv
 
-```
+```bash
 uv run gnostiq pull --only precip
 ```
 
 #### Poetry
 
-```
+```bash
 poetry run gnostiq pull --only precip
 ```
 
 #### Pipenv
 
-```
+```bash
 pipenv run gnostiq pull --only precip
 ```
 
 #### Hatch
 
-```
+```bash
 hatch run gnostiq pull --only precip
 ```
 
 #### PDM
 
-```
+```bash
 pdm run gnostiq pull --only precip
 ```
 
@@ -491,37 +492,37 @@ CHIRPS daily totals are treated as running 00 to 00 UTC. That is an assumption t
 
 #### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 gnostiq pull --only static
 ```
 
 #### uv
 
-```
+```bash
 uv run gnostiq pull --only static
 ```
 
 #### Poetry
 
-```
+```bash
 poetry run gnostiq pull --only static
 ```
 
 #### Pipenv
 
-```
+```bash
 pipenv run gnostiq pull --only static
 ```
 
 #### Hatch
 
-```
+```bash
 hatch run gnostiq pull --only static
 ```
 
 #### PDM
 
-```
+```bash
 pdm run gnostiq pull --only static
 ```
 
@@ -542,37 +543,37 @@ Station reports are checked before anything is trained or scored against them. A
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 gnostiq build
 ```
 
 ### uv
 
-```
+```bash
 uv run gnostiq build
 ```
 
 ### Poetry
 
-```
+```bash
 poetry run gnostiq build
 ```
 
 ### Pipenv
 
-```
+```bash
 pipenv run gnostiq build
 ```
 
 ### Hatch
 
-```
+```bash
 hatch run gnostiq build
 ```
 
 ### PDM
 
-```
+```bash
 pdm run gnostiq build
 ```
 
@@ -615,37 +616,37 @@ These are the forecasts the model has to beat. They are built before the model e
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 gnostiq baselines
 ```
 
 ### uv
 
-```
+```bash
 uv run gnostiq baselines
 ```
 
 ### Poetry
 
-```
+```bash
 poetry run gnostiq baselines
 ```
 
 ### Pipenv
 
-```
+```bash
 pipenv run gnostiq baselines
 ```
 
 ### Hatch
 
-```
+```bash
 hatch run gnostiq baselines
 ```
 
 ### PDM
 
-```
+```bash
 pdm run gnostiq baselines
 ```
 
@@ -673,37 +674,37 @@ Outputs, both under `data/processed/`:
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 gnostiq verify  # or: gnostiq all
 ```
 
 ### uv
 
-```
+```bash
 uv run gnostiq verify  # or: gnostiq all
 ```
 
 ### Poetry
 
-```
+```bash
 poetry run gnostiq verify  # or: gnostiq all
 ```
 
 ### Pipenv
 
-```
+```bash
 pipenv run gnostiq verify  # or: gnostiq all
 ```
 
 ### Hatch
 
-```
+```bash
 hatch run gnostiq verify  # or: gnostiq all
 ```
 
 ### PDM
 
-```
+```bash
 pdm run gnostiq verify  # or: gnostiq all
 ```
 
@@ -767,37 +768,37 @@ Use the requirements files with pip only. uv takes a package from the first inde
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 gnostiq train  # or: gnostiq all
 ```
 
 ### uv
 
-```
+```bash
 uv run gnostiq train  # or: gnostiq all
 ```
 
 ### Poetry
 
-```
+```bash
 poetry run gnostiq train  # or: gnostiq all
 ```
 
 ### Pipenv
 
-```
+```bash
 pipenv run gnostiq train  # or: gnostiq all
 ```
 
 ### Hatch
 
-```
+```bash
 hatch run gnostiq train  # or: gnostiq all
 ```
 
 ### PDM
 
-```
+```bash
 pdm run gnostiq train  # or: gnostiq all
 ```
 
@@ -823,37 +824,37 @@ On a laptop CPU the default settings take a few minutes.
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 gnostiq cases  # or: gnostiq all
 ```
 
 ### uv
 
-```
+```bash
 uv run gnostiq cases  # or: gnostiq all
 ```
 
 ### Poetry
 
-```
+```bash
 poetry run gnostiq cases  # or: gnostiq all
 ```
 
 ### Pipenv
 
-```
+```bash
 pipenv run gnostiq cases  # or: gnostiq all
 ```
 
 ### Hatch
 
-```
+```bash
 hatch run gnostiq cases  # or: gnostiq all
 ```
 
 ### PDM
 
-```
+```bash
 pdm run gnostiq cases  # or: gnostiq all
 ```
 
@@ -869,37 +870,37 @@ A scorecard tells you about the average day. These tell you what the system said
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 gnostiq run
 ```
 
 ### uv
 
-```
+```bash
 uv run gnostiq run
 ```
 
 ### Poetry
 
-```
+```bash
 poetry run gnostiq run
 ```
 
 ### Pipenv
 
-```
+```bash
 pipenv run gnostiq run
 ```
 
 ### Hatch
 
-```
+```bash
 hatch run gnostiq run
 ```
 
 ### PDM
 
-```
+```bash
 pdm run gnostiq run
 ```
 
@@ -924,42 +925,42 @@ The file is written to a temporary name and renamed, so the web server never rea
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 gnostiq serve                             # http://127.0.0.1:8000
 gnostiq serve --host 0.0.0.0 --port 8080
 ```
 
 ### uv
 
-```
+```bash
 uv run gnostiq serve                             # http://127.0.0.1:8000
 uv run gnostiq serve --host 0.0.0.0 --port 8080
 ```
 
 ### Poetry
 
-```
+```bash
 poetry run gnostiq serve                             # http://127.0.0.1:8000
 poetry run gnostiq serve --host 0.0.0.0 --port 8080
 ```
 
 ### Pipenv
 
-```
+```bash
 pipenv run gnostiq serve                             # http://127.0.0.1:8000
 pipenv run gnostiq serve --host 0.0.0.0 --port 8080
 ```
 
 ### Hatch
 
-```
+```bash
 hatch run gnostiq serve                             # http://127.0.0.1:8000
 hatch run gnostiq serve --host 0.0.0.0 --port 8080
 ```
 
 ### PDM
 
-```
+```bash
 pdm run gnostiq serve                             # http://127.0.0.1:8000
 pdm run gnostiq serve --host 0.0.0.0 --port 8080
 ```
@@ -993,7 +994,7 @@ After setting up with your tool as described under Setup:
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```
+```bash
 python scripts/gate.py  # then change the keys it lists in gnostiq.toml
 gnostiq pull            # everything; safe to re-run
 gnostiq all             # build, baselines, train, verify, cases
@@ -1003,7 +1004,7 @@ gnostiq serve           # http://127.0.0.1:8000
 
 ### uv
 
-```
+```bash
 uv run python scripts/gate.py  # then change the keys it lists in gnostiq.toml
 uv run gnostiq pull            # everything; safe to re-run
 uv run gnostiq all             # build, baselines, train, verify, cases
@@ -1013,7 +1014,7 @@ uv run gnostiq serve           # http://127.0.0.1:8000
 
 ### Poetry
 
-```
+```bash
 poetry run python scripts/gate.py  # then change the keys it lists in gnostiq.toml
 poetry run gnostiq pull            # everything; safe to re-run
 poetry run gnostiq all             # build, baselines, train, verify, cases
@@ -1023,7 +1024,7 @@ poetry run gnostiq serve           # http://127.0.0.1:8000
 
 ### Pipenv
 
-```
+```bash
 pipenv run python scripts/gate.py  # then change the keys it lists in gnostiq.toml
 pipenv run gnostiq pull            # everything; safe to re-run
 pipenv run gnostiq all             # build, baselines, train, verify, cases
@@ -1033,7 +1034,7 @@ pipenv run gnostiq serve           # http://127.0.0.1:8000
 
 ### Hatch
 
-```
+```bash
 hatch run python scripts/gate.py  # then change the keys it lists in gnostiq.toml
 hatch run gnostiq pull            # everything; safe to re-run
 hatch run gnostiq all             # build, baselines, train, verify, cases
@@ -1043,7 +1044,7 @@ hatch run gnostiq serve           # http://127.0.0.1:8000
 
 ### PDM
 
-```
+```bash
 pdm run python scripts/gate.py  # then change the keys it lists in gnostiq.toml
 pdm run gnostiq pull            # everything; safe to re-run
 pdm run gnostiq all             # build, baselines, train, verify, cases

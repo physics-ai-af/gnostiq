@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 import synth
 from conftest import SMALL, SYNTH_END, write_cfg
@@ -39,7 +40,7 @@ def test_suggests_moving_the_site_onto_the_station(tmp_path):
     r, report = gate(c)
     assert r.returncode == 0, r.stderr
     text = report.read_text()
-    assert "reports from 9.8667, 8.9000 at 1295 m, 22 km from the configured site" in text
+    assert "NIM00065134 puts the station at 9.8667, 8.9000, 1295 m, 22 km from the configured site." in text
     assert '[site]\nghcnh = "NIM00065134"\nlat = 9.8667\nlon = 8.9\nelev_m = 1295\n' in text
 
 
@@ -47,6 +48,24 @@ def test_station_id_can_be_pinned(station_raw):
     r, report = gate(station_raw, "NIM00065134")
     assert r.returncode == 0, r.stderr
     assert "## GHCNh records near the site" not in report.read_text()
+
+
+def test_a_rough_synop_position_does_not_move_the_site(tmp_path):
+    c = cfg.load(write_cfg(tmp_path, SMALL))
+    tru, _ = synth.truth(c, SYNTH_END)
+    synth.write_station(c, tru, np.random.default_rng(1))
+    path = c.paths.raw / "station" / "GHCNh_NIM00065134_por.psv"
+    g = pd.read_csv(path, sep="|", dtype=str, keep_default_na=False)
+    # the thermometer the METAR reads, filed with a grid-box position as at Abuja
+    t = tru.set_index(tru.valid.dt.strftime("%Y-%m-%dT%H:%M:%S")).t.round()
+    g["temperature"] = g.DATE.map(t).astype(str)
+    g["LATITUDE"], g["LONGITUDE"] = "9.75", "9.0"
+    g.to_csv(path, sep="|", index=False)
+    r, report = gate(c)
+    assert r.returncode == 0, r.stderr
+    text = report.read_text()
+    assert "- reading: same instrument" in text and "puts the station at" not in text
+    assert '[site]\nghcnh = "NIM00065134"\n\n[truth]' in text
 
 
 @pytest.fixture(scope="module")
