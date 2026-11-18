@@ -60,7 +60,9 @@ def cache(c):
 def pull(c, refresh=False):
     path = cache(c)
     have = pd.read_parquet(path) if path.exists() else pd.DataFrame(columns=["day", "pt", "tp24", "stage"])
-    end = pd.Timestamp.now("UTC").tz_localize(None).floor("D") - pd.Timedelta(days=2)
+    today = pd.Timestamp.now("UTC").tz_localize(None).floor("D")
+    # nothing after the test season is scored, so don't spend reads on it
+    end = min(today - pd.Timedelta(days=2), pd.Timestamp(c.window.test_end))
     want = pd.date_range(c.window.start, end, freq="D")
     todo = want.difference(pd.DatetimeIndex(have.day[have.stage == "final"]))
     if len(todo) == 0:
@@ -76,7 +78,7 @@ def pull(c, refresh=False):
             r = one(day, c.site.lat, c.site.lon, c.truth.chirps_flavor)
             if r:
                 rows.append(r)
-            if n % 200 == 0:
+            if n % 50 == 0:
                 log.info("chirps: %d/%d", n, len(todo))
                 save(path, have, rows)
             time.sleep(PAUSE)
