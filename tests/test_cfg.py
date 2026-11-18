@@ -1,5 +1,5 @@
 import pytest
-from conftest import DEFAULT, write_cfg
+from conftest import DEFAULT, LIVE, write_cfg
 
 from gnostiq import cfg
 
@@ -9,6 +9,10 @@ def test_default_loads():
     assert c.site.wmo == "65134"
     assert c.paths.data == DEFAULT.parent / "data"
     assert c.truth.rain_h0 == 0
+
+
+def test_the_repo_config_is_valid():
+    cfg.load(LIVE)
 
 
 @pytest.mark.parametrize(

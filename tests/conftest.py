@@ -10,7 +10,9 @@ import synth  # noqa: E402
 
 from gnostiq import cfg  # noqa: E402
 
-DEFAULT = Path(__file__).resolve().parents[1] / cfg.FILENAME
+# a frozen copy: the live config changes with the site, and fixtures edit this one by string
+DEFAULT = Path(__file__).resolve().parent / "data" / cfg.FILENAME
+LIVE = Path(__file__).resolve().parents[1] / cfg.FILENAME
 
 SMALL = {
     "start = 2021-01-01": "start = 2023-07-01",

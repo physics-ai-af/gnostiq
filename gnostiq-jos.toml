@@ -5,9 +5,9 @@ name = "jos"
 wmo = "65134"
 icao = "DNJO"
 ghcnh = ""                    # empty = look up by WMO number
-lat = 9.8667
-lon = 8.9000
-elev_m = 1295.0
+lat = 9.6398                  # Yakubu Gowon airport, from the gate
+lon = 8.8691
+elev_m = 1289.9
 tz = "Africa/Lagos"
 bbox = [9.4, 10.1, 8.6, 9.2]  # lat0, lat1, lon0, lon1
 
