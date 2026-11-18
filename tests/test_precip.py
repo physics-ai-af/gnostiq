@@ -120,3 +120,9 @@ def test_pull_reads_the_forecast_years_first(tmp_path, monkeypatch):
     cut = pd.Timestamp("2025-06-01")
     assert calls[0] == cut and calls == sorted(calls, key=lambda d: (d < cut, d))
     assert out.day.is_monotonic_increasing and not list(precip.cache(c).parent.glob("*.part"))
+
+
+def test_pull_stops_at_the_end_of_the_test_season(chc):
+    c, state = chc
+    out = precip.pull(c)
+    assert out.day.max() == pd.Timestamp(c.window.test_end) and max(state["calls"]) == pd.Timestamp(c.window.test_end)
