@@ -16,7 +16,7 @@ def site(tmp_path):
 
 def test_reports_are_404_until_generated(site):
     _, client = site
-    for url in ("/api/forecast", "/api/verify", "/api/cases"):
+    for url in ("/api/forecast", "/api/verify", "/api/cases", "/api/live"):
         r = client.get(url)
         assert r.status_code == 404 and "not generated yet" in r.json()["detail"]
     assert client.get("/api/health").json() == {"ok": True, "forecast_init_utc": None}
@@ -28,14 +28,13 @@ def test_reports_are_served_as_written(site):
         "forecast.json": {"init_utc": "2026-07-14T09:00Z", "hourly": [], "daily": []},
         "scorecard.json": {"meta": {"site": "jos"}},
         "cases.json": {"cases": []},
+        "live.json": {"site": "jos", "vars": {}},
     }
     for name, doc in docs.items():
         (c.paths.reports / name).write_text(json.dumps(doc))
-    for url, name in (
-        ("/api/forecast", "forecast.json"),
-        ("/api/verify", "scorecard.json"),
-        ("/api/cases", "cases.json"),
-    ):
+    pairs = [("/api/forecast", "forecast.json"), ("/api/verify", "scorecard.json"), ("/api/cases", "cases.json"),
+             ("/api/live", "live.json")]  # fmt: skip
+    for url, name in pairs:
         r = client.get(url)
         assert r.status_code == 200 and r.json() == docs[name] and "max-age" in r.headers["cache-control"]
     assert client.get("/api/health").json()["forecast_init_utc"] == "2026-07-14T09:00Z"
@@ -45,7 +44,7 @@ def test_page_is_served_and_talks_to_the_api(site):
     _, client = site
     r = client.get("/")
     assert r.status_code == 200 and r.headers["content-type"].startswith("text/html")
-    for url in ("/api/forecast", "/api/verify", "/api/cases"):
+    for url in ("/api/forecast", "/api/verify", "/api/cases", "/api/live"):
         assert url in r.text
     assert "Open-Meteo" in r.text and "CHIRPS" in r.text
     # the site comes from the data, so one page serves any site

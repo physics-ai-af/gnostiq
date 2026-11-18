@@ -69,6 +69,12 @@ def run(c, a):
     run.run(c)
 
 
+def check(c, a):
+    from gnostiq import live
+
+    live.run(c, a.days)
+
+
 def everything(c, a):
     for step in (build, baselines, train, verify, cases):
         step(c, a)
@@ -102,6 +108,8 @@ def main(argv=None):
     add("cases", cases, "write the heavy-rain case replays")
     add("all", everything, "build, baselines, train, verify, cases")
     add("run", run, "fetch the latest forecast and write forecast.json")
+    k = add("check", check, "score past forecasts against reports that came in since")
+    k.add_argument("--days", type=int, default=30)
     s = add("serve", serve, "serve the API and web page")
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--port", type=int, default=8000)

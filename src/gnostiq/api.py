@@ -33,6 +33,10 @@ def create(c=None):
     def cases():
         return report("cases.json")
 
+    @app.get("/api/live")
+    def live():
+        return report("live.json")
+
     @app.get("/api/health")
     def health():
         f = c.paths.reports / "forecast.json"

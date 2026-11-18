@@ -78,7 +78,8 @@ No test touches the network. Downloads are replaced with stand-ins, and anything
 | `tests/test_train.py` | Whole-week validation split, early stopping, spread correction, bundle contents, constraints, the scored model |
 | `tests/test_curve.py` | Nested training sizes, identical test cases for every system, the written report |
 | `tests/test_cases.py` | Case selection, ordering, completeness, and the saved file |
-| `tests/test_run.py` | Lead-day rounding, coverage, physical consistency, input masking, atomic write |
+| `tests/test_run.py` | Lead-day rounding, coverage, physical consistency, input masking, other models, the archive, atomic write |
+| `tests/test_live.py` | One issue per day, common cases, scores against known reports, the written report |
 | `tests/test_api.py` | 404 before reports exist, reports served as written, the page, the method note |
 | `tests/test_pipeline.py` | The whole pipeline through the CLI, then the live run and the API |
 
@@ -958,7 +959,8 @@ The document:
 
 ```
 site, init_utc, base_model, model_trained, thresholds
-hourly[]  valid_utc, lead_day, t2m{q10,q50,q90}, td2m{q10,q50,q90}, raw{t2m,td2m}
+hourly[]  valid_utc, lead_day, t2m{q10,q50,q90}, td2m{q10,q50,q90}, raw{t2m,td2m},
+          models{<extra model>{t2m,td2m}}, clim{t2m{q10,q50,q90}, td2m{q10,q50,q90}}
 daily[]   date, start_utc, lead_day, p_wet, p_heavy, tp24{q50,q90}, raw_tp24
 ```
 
@@ -967,7 +969,56 @@ Two decisions worth knowing about:
 - **Lead days are rounded up.** The archive's "day 2" forecast was issued somewhere between 48 hours and one model cycle more before the hour it describes. A live step 30 hours ahead is therefore treated as day 2, not day 1. The uncertainty shown errs on the wide side rather than the narrow one.
 - **Inputs the model was not trained on are blanked.** The live API serves pressure levels, CAPE and column water vapour; the training archive does not. Letting them in would shift the terrain correction and the moisture estimate away from what was verified, so `run.py` removes any input missing from the bundle's `cols` list. A test checks that those fields cannot change the forecast.
 
-The file is written to a temporary name and renamed, so the web server never reads half a file.
+`models` holds each extra model's raw forecast, fetched live, so the page can draw them next to Gnostiq; a model that is down shows as missing and the forecast still runs. `clim` is the usual range for that hour and date from the station record, and needs `data/interim/obs.parquet`.
+
+The file is written to a temporary name and renamed, so the web server never reads half a file. Each run also saves what it issued to `data/archive/<init>.parquet`: one row per system, variable and hour, exactly as the page showed it.
+
+### Live check
+
+#### Standard Python (`venv` / `virtualenv`)
+
+```bash
+gnostiq check
+```
+
+#### uv
+
+```bash
+uv run gnostiq check
+```
+
+#### Poetry
+
+```bash
+poetry run gnostiq check
+```
+
+#### Pipenv
+
+```bash
+pipenv run gnostiq check
+```
+
+#### Hatch
+
+```bash
+hatch run gnostiq check
+```
+
+#### PDM
+
+```bash
+pdm run gnostiq check
+```
+
+scores those saved forecasts against the airport reports that came in afterwards. It downloads the last 30 days of reports from IEM (`--days` changes that), keeps the first forecast issued on each UTC day so a day of 3-hourly runs counts once, and scores Gnostiq, each raw model and the normal range on the same reports. It writes `data/reports/live.json` and `live.md`; the page shows them under "Last 30 days".
+
+This is the evidence that cannot be tuned after the fact: every forecast was saved before the weather happened. Two limits:
+
+- Reports are whole degrees, which adds about 0.3 C of noise to every system alike.
+- The public Nigerian feed has been thin since April 2026, so the sample grows slowly. Skill intervals need five days of reports before they appear, and a few weeks before they are tight.
+
+On a server, `deploy/gnostiq-check.timer` runs it every morning.
 
 ## API and web page
 
@@ -1139,19 +1190,19 @@ The other tools work on a server too, as long as the environment lands in `.venv
 From your machine, copy the trained models, the reports and the terrain file:
 
 ```
-rsync -a --relative data/models data/reports data/processed/static.json <server>:/opt/gnostiq/app/
+rsync -a --relative data/models data/reports data/processed/static.json data/interim/obs.parquet <server>:/opt/gnostiq/app/
 ```
 
 Then install the services from `deploy/`:
 
 ```
-sudo cp deploy/gnostiq-api.service deploy/gnostiq-run.service deploy/gnostiq-run.timer /etc/systemd/system/
+sudo cp deploy/gnostiq-*.service deploy/gnostiq-*.timer /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now gnostiq-api.service gnostiq-run.timer
+sudo systemctl enable --now gnostiq-api.service gnostiq-run.timer gnostiq-check.timer
 sudo systemctl start gnostiq-run.service     # first forecast now, not in three hours
 ```
 
-The timer refreshes the forecast every three hours. For HTTPS, install Caddy and put your domain in `deploy/Caddyfile`.
+The run timer refreshes the forecast every three hours and saves each one under `data/archive/`. The check timer scores those saved forecasts against new airport reports every morning; the first scores appear the day after the first forecast. `data/interim/obs.parquet` in the copy above is the station record the "normal for the date" range is computed from. For HTTPS, install Caddy and put your domain in `deploy/Caddyfile`.
 
 To check it: `curl localhost:8000/api/health` shows when the forecast was issued, and `journalctl -u gnostiq-run` shows the last run.
 
