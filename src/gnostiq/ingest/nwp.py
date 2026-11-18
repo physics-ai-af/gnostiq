@@ -175,6 +175,26 @@ def live(c, days=9):
     return df.dropna(subset=["f_t2m"]).reset_index(drop=True), js.get("elevation")
 
 
+def live_extra(c, days=9):
+    out = {}
+    for m in c.nwp.extra:
+        params = {**base_params(c, m), "forecast_days": days, "past_days": 2, "hourly": "temperature_2m,dew_point_2m"}
+        try:
+            h = _get(LIVE, params)["hourly"]
+        except (Missing, requests.RequestException) as e:
+            # its inputs fall back to "missing", which the net saw in training
+            log.warning("live %s unavailable: %s", m, e)
+            h = {"time": [], "temperature_2m": [], "dew_point_2m": []}
+        out[m] = pd.DataFrame(
+            {
+                "valid": pd.to_datetime(h["time"]),
+                "f_t2m": np.asarray(h["temperature_2m"], dtype=float),
+                "f_td2m": np.asarray(h["dew_point_2m"], dtype=float),
+            }
+        )
+    return out
+
+
 def _get(url, params, tries=3):
     err = None
     for i in range(tries):

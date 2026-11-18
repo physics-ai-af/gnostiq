@@ -37,6 +37,23 @@ def test_emos_removes_a_bias_and_learns_the_spread():
     assert np.mean(sigma) == pytest.approx(1.5, abs=0.15)
 
 
+def test_multi_model_emos_learns_to_lean_on_a_better_model(raw):
+    c = raw
+    rng = np.random.default_rng(1)
+    n = 4000
+    t = pd.date_range("2024-01-01", periods=n, freq="3h")
+    truth = 22 + 5 * np.sin(np.arange(n) / 8) + rng.normal(0, 1.0, n)
+    prior = truth + rng.normal(0, 1.5, n)
+    better = truth + rng.normal(0, 0.5, n)
+    df = pd.DataFrame({"valid": t, "lead_day": 1, "t_prior": prior, "o_t2m": truth, "x_icon_dt2m": better - prior})
+    df.loc[::10, "x_icon_dt2m"] = np.nan
+    fit, test = df.iloc[:3000], df.iloc[3000:].reset_index(drop=True)
+    one = baselines.emos(c, fit, test, "t_prior", "o_t2m")
+    two = baselines.emos(c, fit, test, "t_prior", "o_t2m", ["x_icon_dt2m"])
+    err = [np.mean(np.abs(m[0] - test.o_t2m)) for m in (one, two)]
+    assert err[1] < 0.6 * err[0] and np.isfinite(two[0][test.lead_day == 1]).all()
+
+
 def test_rain_emos_ties_probability_and_amount_to_the_forecast():
     rng = np.random.default_rng(0)
     n = 4000
@@ -71,9 +88,9 @@ def test_rain_climatology_uses_days_near_the_calendar_date(raw):
 def test_hourly_baselines_cover_every_system(based):
     c = based
     pred = pd.read_parquet(c.paths.processed / "pred_hourly_base.parquet")
-    assert set(pred.system) == {"clim", "persist", "raw", "lapse", "emos", f"raw:{c.nwp.extra[0]}"}
+    assert set(pred.system) == {"clim", "persist", "raw", "lapse", "emos", "emos_multi", f"raw:{c.nwp.extra[0]}"}
     assert set(pred["var"]) == {"t2m", "td2m"} and pred.mu.notna().all()
-    assert set(pred.system[pred.sigma.notna()]) == {"clim", "emos"} and (pred.sigma.dropna() > 0).all()
+    assert set(pred.system[pred.sigma.notna()]) == {"clim", "emos", "emos_multi"} and (pred.sigma.dropna() > 0).all()
 
 
 def test_persistence_uses_the_observation_one_lead_back(based):

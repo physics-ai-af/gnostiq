@@ -10,9 +10,9 @@ from gnostiq import dist
 
 log = logging.getLogger("gnostiq")
 
-CORE_H = ["clim", "persist", "raw", "lapse", "emos", "gnostiq"]
+CORE_H = ["clim", "persist", "raw", "lapse", "emos", "emos_multi", "gnostiq"]
 CORE_D = ["clim", "persist", "raw", "emos", "gnostiq"]
-REFS = ["clim", "raw", "emos"]
+REFS = ["clim", "raw", "emos", "emos_multi"]
 BOOT = 1000
 EDGES = np.linspace(0, 1, 11)
 

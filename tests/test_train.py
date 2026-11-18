@@ -1,8 +1,18 @@
 import numpy as np
 import pandas as pd
+import pytest
 import torch
 
 from gnostiq import dist, model, physics, train, verify
+
+
+def test_spread_factor_recovers_an_overconfident_sigma():
+    rng = np.random.default_rng(0)
+    mu = rng.normal(25, 3, 5000)
+    y = mu + rng.normal(0, 2.0, 5000)
+    assert train.spread_factor(y, mu, np.full(5000, 1.0)) == pytest.approx(2.0, abs=0.1)
+    assert train.spread_factor(y, mu, np.full(5000, 2.0)) == pytest.approx(1.0, abs=0.05)
+    assert train.spread_factor(y[:10], mu[:10], np.ones(10)) == 1.0
 
 
 def test_validation_split_holds_out_whole_weeks():
@@ -60,9 +70,8 @@ def test_bundles_record_what_they_were_trained_on(trained):
     assert hb["kind"] == "hourly" and db["kind"] == "daily"
     assert len(hb["states"]) == c.model.seeds and hb["hidden"] == c.model.hidden and hb["base"] == c.nwp.base
     assert hb["train_end"] == str(c.window.train_end) and hb["s_t"] > 0
-    assert set(hb["stats"]["feats"]) <= set(physics.HOURLY_FEATS) and set(db["stats"]["feats"]) <= set(
-        physics.DAILY_FEATS
-    )
+    hourly_feats = physics.HOURLY_FEATS + physics.extra_feats(c.nwp.extra)
+    assert set(hb["stats"]["feats"]) <= set(hourly_feats) and set(db["stats"]["feats"]) <= set(physics.DAILY_FEATS)
 
 
 def test_trains_without_fields_the_archive_lacks(trained):
@@ -88,6 +97,13 @@ def test_rain_predictions_are_coherent(trained):
     q = p[dist.QCOLS].to_numpy()
     assert (np.diff(q, axis=1) >= -1e-6).all() and (q >= 0).all()
     assert ((p.p10 <= p.p1 + 1e-9) & (p.p1 <= 1) & (p.p10 >= 0)).all()
+
+
+def test_hourly_bundle_uses_the_extra_models_and_corrects_its_spread(trained):
+    b = model.load(trained.paths.models / "hourly.pt")
+    assert {f for f in b["stats"]["feats"] if f.startswith("x_")} <= set(physics.extra_feats(trained.nwp.extra))
+    assert any(f.startswith("x_") for f in b["stats"]["feats"])
+    assert set(b["inflate"]) == {"t", "td"} and all(0.5 <= k <= 3.0 for k in b["inflate"].values())
 
 
 def test_scorecard_scores_the_model_against_each_reference(trained):

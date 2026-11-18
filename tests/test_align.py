@@ -38,6 +38,9 @@ def test_hourly_pairs_join_on_valid_time(pairs):
     nwp = pd.read_parquet(c.paths.interim / f"nwp_{c.nwp.base}.parquet").set_index(["valid", "lead_day"]).f_t2m
     row = p.iloc[len(p) // 2]
     assert row.o_t2m == obs[row.valid] and row.f_t2m == nwp[(row.valid, row.lead_day)]
+    m = c.nwp.extra[0]
+    extra = pd.read_parquet(c.paths.interim / f"nwp_{m}.parquet").set_index(["valid", "lead_day"]).f_t2m
+    assert row[f"x_{m}_dt2m"] == pytest.approx(extra[(row.valid, row.lead_day)] - row.f_t2m)
 
 
 def test_daily_pairs_carry_truth_and_a_moisture_supply(pairs):

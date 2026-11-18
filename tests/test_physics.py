@@ -104,3 +104,16 @@ def test_features_cover_every_declared_name():
     h = physics.hourly_features(frame(), SITE, 1295.0)
     assert set(physics.HOURLY_FEATS) <= set(h.columns)
     assert set(physics.DAILY_FEATS) - {"lead_day"} <= set(physics.daily_features(h, 0).columns) | {"lead_day"}
+
+
+def test_extra_models_become_offsets_from_the_base():
+    t = pd.date_range("2025-07-01", periods=3, freq="h")
+    base = pd.DataFrame({"valid": t, "lead_day": 1, "f_t2m": [20.0, 21.0, 22.0], "f_td2m": [15.0, 15.0, 15.0]})
+    icon = pd.DataFrame({"valid": t[:2], "lead_day": 1, "f_t2m": [21.0, 20.5], "f_td2m": [16.0, 14.0]})
+    out = physics.add_extras(base, {"icon_seamless": icon})
+    assert out.x_icon_seamless_dt2m.tolist()[:2] == [1.0, -0.5] and np.isnan(out.x_icon_seamless_dt2m.iloc[2])
+    assert out.x_icon_seamless_dtd2m.tolist()[:2] == [1.0, -1.0] and out.x_icon_seamless_ok.tolist() == [1, 1, 0]
+    assert len(out) == len(base) and physics.extra_feats(["icon_seamless"]) == [
+        "x_icon_seamless_dt2m", "x_icon_seamless_dtd2m", "x_icon_seamless_ok"]  # fmt: skip
+    assert physics.extra_deltas(out, "t2m") == ["x_icon_seamless_dt2m"]
+    assert physics.extra_deltas(out, "td2m") == ["x_icon_seamless_dtd2m"]

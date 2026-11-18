@@ -4,10 +4,15 @@ import numpy as np
 import pandas as pd
 import synth
 
-from gnostiq import run
+from gnostiq import model, run
 from gnostiq.ingest import nwp
 
 INIT = pd.Timestamp("2025-07-14 09:00")
+
+
+def live_extras(c, init, empty=False):
+    f = synth.live_frame(c, init, seed=2)[["valid", "f_t2m", "f_td2m"]]
+    return {m: f.iloc[:0] if empty else f for m in c.nwp.extra}
 
 
 def test_live_steps_round_up_to_the_next_lead_day():
@@ -48,10 +53,20 @@ def test_fields_the_archive_never_supplied_cannot_move_the_forecast(trained):
 
 def test_run_writes_the_document_atomically(trained, monkeypatch):
     c = trained
-    monkeypatch.setattr(
-        nwp, "live", lambda c, days=9: (synth.live_frame(c, pd.Timestamp.now("UTC").tz_localize(None)), 1182.0)
-    )
+    now = pd.Timestamp.now("UTC").tz_localize(None)
+    monkeypatch.setattr(nwp, "live", lambda c, days=9: (synth.live_frame(c, now), 1182.0))
+    monkeypatch.setattr(nwp, "live_extra", lambda c, days=9: live_extras(c, now))
     doc = run.run(c)
     path = c.paths.reports / "forecast.json"
     assert json.loads(path.read_text()) == doc and not list(c.paths.reports.glob("*.part"))
     assert doc["hourly"] and doc["site"]["name"] == c.site.name
+
+
+def test_extra_models_feed_the_forecast_and_a_missing_one_is_survivable(trained):
+    c = trained
+    frame = synth.live_frame(c, INIT)
+    assert any(k.startswith("x_") for k in model.load(c.paths.models / "hourly.pt")["stats"]["feats"])
+    for extras in (live_extras(c, INIT), live_extras(c, INIT, empty=True)):
+        doc = run.forecast(c, frame, INIT, extras)
+        assert len(doc["hourly"]) == 24 * max(c.lead_days)
+        assert all(x["td2m"]["q50"] <= x["t2m"]["q50"] for x in doc["hourly"])

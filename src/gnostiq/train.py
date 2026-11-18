@@ -6,8 +6,9 @@ import logging
 import numpy as np
 import pandas as pd
 import torch
+from scipy import optimize
 
-from gnostiq import baselines, model, physics
+from gnostiq import baselines, dist, model, physics
 
 log = logging.getLogger("gnostiq")
 
@@ -20,7 +21,7 @@ def val_mask(day):
     return np.asarray(week % 5 == 2)
 
 
-def loop(net, loss_fn, tr, va, c, seed):
+def loop(net, loss_fn, tr, va, c, seed, quiet=False):
     torch.manual_seed(seed)
     opt = torch.optim.Adam(net.parameters(), lr=3e-3, weight_decay=1e-4)
     n = len(tr[0])
@@ -44,7 +45,8 @@ def loop(net, loss_fn, tr, va, c, seed):
             stale += 1
             if stale >= c.model.patience:
                 break
-    log.info("  seed %d: %d epochs, validation loss %.4f", seed, epochs, best)
+    if not quiet:
+        log.info("  seed %d: %d epochs, validation loss %.4f", seed, epochs, best)
     return state, best
 
 
@@ -59,11 +61,23 @@ def stamp(c, tr):
     }
 
 
-def hourly(c):
+def spread_factor(y, mu, sig):
+    ok = np.isfinite(y) & np.isfinite(mu) & (sig > 0)
+    if ok.sum() < 50:
+        return 1.0
+    res = optimize.minimize_scalar(
+        lambda k: dist.crps_norm(y[ok], mu[ok], k * sig[ok]).mean(), bounds=(0.5, 3.0), method="bounded"
+    )
+    return float(res.x)
+
+
+def hourly_pairs(c):
     p = pd.read_parquet(c.paths.processed / "pairs_hourly.parquet")
-    p = p[p.t_prior.notna() & p.dep_prior.notna() & p.o_t2m.notna()].reset_index(drop=True)
-    tr = p[p.split == "train"]
-    st = model.fit_stats(tr, physics.HOURLY_FEATS)
+    return p[p.t_prior.notna() & p.dep_prior.notna() & p.o_t2m.notna()].reset_index(drop=True)
+
+
+def fit_hourly(c, tr, hold, quiet=False):
+    st = model.fit_stats(tr, physics.HOURLY_FEATS + physics.extra_feats(c.nwp.extra))
     s_t = float((tr.o_t2m - tr.t_prior).std())
     s_d = float((tr.o_td2m - tr.td_prior).std())
     s_d = s_d if np.isfinite(s_d) and s_d > 0 else s_t
@@ -72,15 +86,31 @@ def hourly(c):
         return (model.design(df, st), model.col(df, "t_prior"), model.col(df, "dep_prior"),
                 model.col(df, "o_t2m"), model.col(df, "o_td2m"))  # fmt: skip
 
-    hold = val_mask(tr.valid)
     a, b = pack(tr[~hold]), pack(tr[hold])
-    log.info("train hourly: %d fit rows, %d validation rows, %d features", len(a[0]), len(b[0]), len(st["feats"]))
+    if not quiet:
+        log.info("train hourly: %d fit rows, %d validation rows, %d features", len(a[0]), len(b[0]), len(st["feats"]))
     states = []
     for seed in range(c.model.seeds):
         net = model.Hourly(len(st["feats"]), c.model.hidden, s_t, s_d)
-        states.append(loop(net, model.hourly_loss, a, b, c, seed)[0])
-
+        states.append(loop(net, model.hourly_loss, a, b, c, seed, quiet)[0])
     bundle = {"kind": "hourly", "stats": st, "s_t": s_t, "s_d": s_d, "states": states, **stamp(c, tr)}
+
+    # sigma is learned on rows the nets have seen; rescale it on the held-out weeks
+    va = tr[hold]
+    t_mu, t_sig, td_mu, td_sig = model.predict_hourly(bundle, va)
+    bundle["inflate"] = {
+        "t": spread_factor(va.o_t2m.to_numpy(float), t_mu, t_sig),
+        "td": spread_factor(va.o_td2m.to_numpy(float), td_mu, td_sig),
+    }
+    if not quiet:
+        log.info("  spread x%.2f t2m, x%.2f td2m", bundle["inflate"]["t"], bundle["inflate"]["td"])
+    return bundle
+
+
+def hourly(c):
+    p = hourly_pairs(c)
+    tr = p[p.split == "train"]
+    bundle = fit_hourly(c, tr, val_mask(tr.valid))
     model.save(bundle, c.paths.models / "hourly.pt")
 
     t_mu, t_sig, td_mu, td_sig = model.predict_hourly(bundle, p)

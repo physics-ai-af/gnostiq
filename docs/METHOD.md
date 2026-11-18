@@ -16,7 +16,8 @@ A statistical correction layer on top of a global weather model, for one site: J
 2. Dewpoint cannot exceed temperature. The network predicts a dewpoint depression through a softplus link, so the constraint holds by construction for every input and every weight setting.
 3. Rain is non-negative with a point mass at dry. A hurdle at the wet threshold (default 1 mm) with a gamma distribution for the excess.
 4. Rain amount is tied to moisture supply. The network predicts a dimensionless efficiency; the conditional mean amount is efficiency times precipitable water. Efficiency above a cap (default 2) is penalised. The cap is soft and above one because a day of convergence can rain out more than the instantaneous column holds. The archive has no column water vapour for ECMWF, so precipitable water is estimated from the forecast surface dewpoint (Reitan 1963). That is a weaker constraint than the model's own column value.
-5. Physically meaningful predictors: solar zenith angle, forecast shortwave radiation and cloud cover, and the north-easterly wind component that marks Harmattan flow. CAPE and mid-level humidity would belong here; the archive does not supply them for ECMWF.
+5. Other models as inputs. GFS and ICON enter as offsets from the base forecast, with a flag where a model has no value (ICON has no day 7). The network can learn when one model beats another; EMOS gets the same inputs as `emos_multi`, so the comparison stays fair.
+6. Physically meaningful predictors: solar zenith angle, forecast shortwave radiation and cloud cover, and the north-easterly wind component that marks Harmattan flow. CAPE and mid-level humidity would belong here; the archive does not supply them for ECMWF.
 
 ## What it is compared against
 
@@ -26,8 +27,17 @@ All on identical cases from a test window the model never saw:
 - persistence
 - the raw model, and the raw model after the terrain correction alone
 - EMOS: non-homogeneous Gaussian regression for temperature and dewpoint, logistic plus gamma regression for rain, fitted per lead day
+- EMOS with the other models' offsets as extra predictors (`emos_multi`), the reference with the same inputs as the network
 
 EMOS is the comparison that matters. Beating a raw model that sits at the wrong height shows little; a method that cannot beat EMOS has not earned its complexity.
+
+## Spread
+
+The networks learn their spread on the rows they fit, so it comes out narrow on new days. After training, one factor each for temperature and dewpoint rescales the spread to minimise CRPS on the held-out weeks.
+
+## How much data it needs
+
+`gnostiq curve` refits EMOS and the network on 1, 2, 3 and 6 months of the archive and on all of it, scoring each on the same test cases. That is the direct test of the claim that the method works with little data.
 
 ## Scores
 

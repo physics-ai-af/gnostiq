@@ -45,6 +45,12 @@ def train(c, a):
     train.run(c)
 
 
+def curve(c, a):
+    from gnostiq import curve
+
+    curve.run(c)
+
+
 def verify(c, a):
     from gnostiq import verify
 
@@ -91,6 +97,7 @@ def main(argv=None):
     add("build", build, "parse raw files into the working tables")
     add("baselines", baselines, "fit the reference forecasts")
     add("train", train, "fit the correction networks")
+    add("curve", curve, "learning curve: skill against archive length (a few minutes)")
     add("verify", verify, "write the scorecard for the test window")
     add("cases", cases, "write the heavy-rain case replays")
     add("all", everything, "build, baselines, train, verify, cases")

@@ -103,6 +103,15 @@ def test_predict_hourly_returns_one_value_per_row():
     assert (t_sig > 0).all() and (td_sig > 0).all()
 
 
+def test_predict_hourly_applies_the_spread_correction():
+    b, df = bundle("hourly")
+    df = df.assign(t_prior=22.0, dep_prior=5.0)
+    plain = model.predict_hourly(b, df)
+    wide = model.predict_hourly({**b, "inflate": {"t": 1.5, "td": 2.0}}, df)
+    assert np.allclose(wide[0], plain[0]) and np.allclose(wide[2], plain[2])
+    assert np.allclose(wide[1], 1.5 * plain[1]) and np.allclose(wide[3], 2.0 * plain[3])
+
+
 def test_predict_daily_scales_amount_with_moisture():
     b, df = bundle("daily")
     p, m, k = model.predict_daily(b, df.assign(pw=np.linspace(10, 60, 20)))

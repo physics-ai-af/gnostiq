@@ -78,8 +78,8 @@ a { color: inherit; }
 <div id="tip"></div>
 <script>
 const NS = "http://www.w3.org/2000/svg";
-const NAMES = { gnostiq: "Gnostiq", raw: "Raw model", emos: "EMOS", clim: "Climatology", persist: "Persistence", lapse: "Height-corrected" };
-const ORDER = ["gnostiq", "raw", "emos", "lapse", "persist", "clim"];
+const NAMES = { gnostiq: "Gnostiq", raw: "Raw model", emos: "EMOS", emos_multi: "EMOS, all models", clim: "Climatology", persist: "Persistence", lapse: "Height-corrected" };
+const ORDER = ["gnostiq", "raw", "emos", "emos_multi", "lapse", "persist", "clim"];
 const label = (s) => NAMES[s] || s.replace("raw:", "Raw ");
 const COLOR = { gnostiq: "var(--gnostiq)", raw: "var(--raw)", emos: "var(--emos)" };
 const $ = (s) => document.querySelector(s);
