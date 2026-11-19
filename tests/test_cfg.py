@@ -135,6 +135,10 @@ def test_sites_come_from_the_one_file_in_order(tmp_path, monkeypatch):
 
 def test_a_file_without_sites_is_refused(tmp_path):
     p = write_cfg(tmp_path)
-    p.write_text(p.read_text().split("[sites.jos]")[0])
+    text = p.read_text().split("[sites.jos]")[0]
+    p.write_text(text)
     with pytest.raises(ValueError, match=r"no \[sites.<name>\] table"):
+        cfg.load(p)
+    p.write_text('[site]\nname = "jos"\n\n' + text + '[paths]\ndata = "data"\n')
+    with pytest.raises(ValueError, match=r"now one \[sites.<name>\] table per site"):
         cfg.load(p)

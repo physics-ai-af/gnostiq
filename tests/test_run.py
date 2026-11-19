@@ -1,3 +1,4 @@
+import gzip
 import json
 import shutil
 
@@ -63,8 +64,10 @@ def test_run_writes_the_document_atomically(trained, monkeypatch):
     path = c.paths.reports / "forecast.json"
     assert json.loads(path.read_text()) == doc and not list(c.paths.reports.glob("*.part"))
     assert doc["hourly"] and doc["site"]["name"] == c.site.name
-    saved = pd.read_parquet(c.paths.archive / f"{pd.Timestamp(doc['init_utc'].rstrip('Z')):%Y%m%dT%H}.parquet")
-    assert saved.equals(run.issued(doc))
+    stem = c.paths.archive / f"{pd.Timestamp(doc['init_utc'].rstrip('Z')):%Y%m%dT%H}"
+    assert pd.read_parquet(stem.with_suffix(".parquet")).equals(run.issued(doc))
+    # the page's own bytes, kept for the public record
+    assert gzip.decompress(stem.with_suffix(".json.gz").read_bytes()) == path.read_bytes()
 
 
 def test_the_forecast_carries_other_models_and_the_normal_range(trained):
@@ -89,7 +92,8 @@ def test_issued_rows_are_what_the_page_shows(trained):
     first = doc["hourly"][0]
     g = t[(t.system == "gnostiq") & (t["var"] == "t2m")].iloc[0]
     assert g.mu == first["t2m"]["q50"] and g.sigma > 0
-    assert t[t.system.str.startswith("raw")].sigma.isna().all()
+    assert (g.q10, g.q90) == (first["t2m"]["q10"], first["t2m"]["q90"])
+    assert t[t.system.str.startswith("raw")][["sigma", "q10", "q90"]].isna().all().all()
 
 
 def test_extra_models_feed_the_forecast_and_a_missing_one_is_survivable(trained):

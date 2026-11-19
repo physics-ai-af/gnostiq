@@ -161,6 +161,8 @@ def load(path=None, site=None):
     path = Path(path or find()).resolve()
     raw = read(path)
     tables = raw.get("sites") or {}
+    if not tables and "site" in raw:
+        raise ValueError(f"{path}: [site] and [paths] are now one [sites.<name>] table per site, with data in it")
     if not tables:
         raise ValueError(f"{path}: no [sites.<name>] table")
     name = site or os.environ.get("GNOSTIQ_SITE") or next(iter(tables))

@@ -5,6 +5,7 @@ description = "Physics-constrained post-processing of global NWP for Jos, Nigeri
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "boto3>=1.36",
     "fastapi>=0.115",
     "numpy>=2.1",
     "pandas>=2.2",

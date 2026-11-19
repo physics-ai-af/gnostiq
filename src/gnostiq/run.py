@@ -6,7 +6,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-from gnostiq import baselines, dist, model, physics
+from gnostiq import baselines, dist, model, physics, publish
 from gnostiq.ingest import nwp, static
 
 log = logging.getLogger("gnostiq")
@@ -56,7 +56,7 @@ def forecast(c, frame, init, extras=None):
     others = [m for m in (extras or {}) if f"x_{m}_dt2m" in fut]
 
     def q(b, i):
-        return {"q10": float(b[0][i]), "q50": float(b[1][i]), "q90": float(b[2][i])}
+        return {"q10": round(float(b[0][i]), 1), "q50": round(float(b[1][i]), 1), "q90": round(float(b[2][i]), 1)}
 
     hourly = []
     for i, (v, ld) in enumerate(zip(fut.valid, fut.lead_day, strict=True)):
@@ -116,12 +116,13 @@ def issued(doc):
                 got.append(("clim", s["clim"][var]))
             for system, x in got:
                 if isinstance(x, dict):
-                    mu, sigma = x["q50"], (x["q90"] - x["q10"]) / (2 * dist.Z80)
+                    # the band as drawn: dewpoint is capped by temperature, so it need not be symmetric
+                    mu, sigma, lo, hi = x["q50"], (x["q90"] - x["q10"]) / (2 * dist.Z80), x["q10"], x["q90"]
                 else:
-                    mu, sigma = x, np.nan
+                    mu, sigma, lo, hi = x, np.nan, np.nan, np.nan
                 if mu is not None:
-                    rows.append((init, valid, s["lead_day"], var, system, mu, sigma))
-    return pd.DataFrame(rows, columns=["init", "valid", "lead_day", "var", "system", "mu", "sigma"])
+                    rows.append((init, valid, s["lead_day"], var, system, mu, sigma, lo, hi))
+    return pd.DataFrame(rows, columns=["init", "valid", "lead_day", "var", "system", "mu", "sigma", "q10", "q90"])
 
 
 def run(c):
@@ -133,9 +134,12 @@ def run(c):
     c.paths.reports.mkdir(parents=True, exist_ok=True)
     path = c.paths.reports / "forecast.json"
     tmp = path.with_name(path.name + ".part")
-    tmp.write_text(json.dumps(doc))
+    raw = json.dumps(doc).encode()
+    tmp.write_bytes(raw)
     tmp.replace(path)
     c.paths.archive.mkdir(parents=True, exist_ok=True)
     issued(doc).to_parquet(c.paths.archive / f"{init:%Y%m%dT%H}.parquet", index=False)
+    # the page's own bytes, for the public record
+    (c.paths.archive / f"{init:%Y%m%dT%H}.json.gz").write_bytes(publish.pack(raw))
     log.info("forecast: %d hourly steps, %d days, init %s", len(doc["hourly"]), len(doc["daily"]), doc["init_utc"])
     return doc

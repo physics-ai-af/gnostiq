@@ -110,6 +110,25 @@ def season(c, a):
     each(c, a, lambda x: season.run(x, a.start, a.end))
 
 
+def publish(c, a):
+    from gnostiq import publish
+
+    each(c, a, lambda x: publish.run(x, a.days))
+
+
+def verify_record(c, a):
+    from gnostiq import publish
+
+    rows = publish.verify(a.cid, a.depth)
+    for r in rows:
+        print(f"{'ok' if r['ok'] else 'FAILED':6} {r['site']:10} issued {r['issued_utc']}  record {r['record']}",
+              *r["problems"], sep="  ")  # fmt: skip
+    bad = sum(not r["ok"] for r in rows)
+    print(f"{len(rows)} records checked, {bad} failed")
+    if bad:
+        raise SystemExit(1)
+
+
 def everything(c, a):
     for step in (build, baselines, train, verify, cases):
         step(c, a)
@@ -149,6 +168,12 @@ def main(argv=None):
     k = add("check", check, "score past forecasts against reports that came in since")
     k.add_argument("--days", type=int, default=30)
     k.add_argument("--all-sites", action="store_true", help="every site in the config")
+    s = add("publish", publish, "store each day's first forecast and its record on Auto Drive")
+    s.add_argument("--days", type=int, default=3, help="catch up missed days this far back")
+    s.add_argument("--all-sites", action="store_true", help="every site in the config")
+    s = add("verify-record", verify_record, "check a published record, and the ones before it, from Auto Drive")
+    s.add_argument("cid", help="CID of a record")
+    s.add_argument("--depth", type=int, help="stop after this many records")
     s = add("season", season, "score a past season against NiMet reports (default: the latest wet season)")
     s.add_argument("--start", help="first day, YYYY-MM-DD")
     s.add_argument("--end", help="last day, YYYY-MM-DD")
@@ -159,6 +184,9 @@ def main(argv=None):
 
     a = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
+    if a.cmd == "verify-record":
+        # anyone can check a record; it needs no config
+        return a.fn(None, a)
     c = cfg.load(a.config, a.site) if a.config or a.site else cfg.get()
     if c.donor and a.cmd in OWN:
         raise SystemExit(
