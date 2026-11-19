@@ -6,7 +6,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-from gnostiq import baselines, dist, model, physics
+from gnostiq import baselines, dist, model, physics, publish
 from gnostiq.ingest import nwp, static
 
 log = logging.getLogger("gnostiq")
@@ -134,9 +134,12 @@ def run(c):
     c.paths.reports.mkdir(parents=True, exist_ok=True)
     path = c.paths.reports / "forecast.json"
     tmp = path.with_name(path.name + ".part")
-    tmp.write_text(json.dumps(doc))
+    raw = json.dumps(doc).encode()
+    tmp.write_bytes(raw)
     tmp.replace(path)
     c.paths.archive.mkdir(parents=True, exist_ok=True)
     issued(doc).to_parquet(c.paths.archive / f"{init:%Y%m%dT%H}.parquet", index=False)
+    # the page's own bytes, for the public record
+    (c.paths.archive / f"{init:%Y%m%dT%H}.json.gz").write_bytes(publish.pack(raw))
     log.info("forecast: %d hourly steps, %d days, init %s", len(doc["hourly"]), len(doc["daily"]), doc["init_utc"])
     return doc

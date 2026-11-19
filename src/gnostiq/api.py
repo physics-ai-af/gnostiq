@@ -15,6 +15,7 @@ REPORTS = {
     "cases": "cases.json",
     "live": "live.json",
     "season": "season.json",
+    "records": "records.json",
 }
 
 

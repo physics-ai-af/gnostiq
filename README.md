@@ -12,7 +12,7 @@ Use the block for your tool.
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 pytest                         # everything
 python -m pytest               # everything, explicit interpreter
 pytest tests/test_pipeline.py  # one file
@@ -20,35 +20,35 @@ pytest tests/test_pipeline.py  # one file
 
 ### uv
 
-```bash
+```
 uv run pytest                         # everything
 uv run pytest tests/test_pipeline.py  # one file
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run pytest                         # everything
 poetry run pytest tests/test_pipeline.py  # one file
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run pytest                         # everything
 pipenv run pytest tests/test_pipeline.py  # one file
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run pytest                         # everything
 hatch run pytest tests/test_pipeline.py  # one file
 ```
 
 ### PDM
 
-```bash
+```
 pdm run pytest                         # everything
 pdm run pytest tests/test_pipeline.py  # one file
 ```
@@ -86,6 +86,7 @@ No test touches the network. Downloads are replaced with stand-ins, and anything
 | `tests/test_nimet.py` | A real NiMet report, paging by month, units, off-hour and gross values, distance to the site |
 | `tests/data/nimet_65134_excerpt.json` | One real Jos synop from NiMet's node, as served |
 | `tests/test_season.py` | Every system on the same reports, no overlap with training, the default season, a borrowing site |
+| `tests/test_publish.py` | First issue per day, the chain of records, repeat runs, tampering caught, dry run, verify without a config |
 | `tests/test_api.py` | 404 before reports exist, reports served as written, every site beside the config, the page, the method note |
 | `tests/test_pipeline.py` | The whole pipeline through the CLI, then the live run for both sites and the API |
 
@@ -95,7 +96,7 @@ You need Python 3.12 or newer. There are no API keys and no accounts. Each block
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 python -m venv .venv                   # or: virtualenv .venv
 source .venv/bin/activate              # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
@@ -115,7 +116,7 @@ The requirements files list direct dependencies only, so pip still picks version
 
 ### uv
 
-```bash
+```
 uv sync
 uv run pytest
 uv run ruff check . && uv run ruff format --check .
@@ -125,7 +126,7 @@ uv run ruff check . && uv run ruff format --check .
 
 ### Poetry
 
-```bash
+```
 poetry install
 poetry run pytest
 poetry run ruff check . && poetry run ruff format --check .
@@ -135,7 +136,7 @@ Poetry reads the standard `[project]` and `[dependency-groups]` tables, so there
 
 ### Pipenv
 
-```bash
+```
 pipenv install --dev
 pipenv run pytest
 pipenv run ruff check . && pipenv run ruff format --check .
@@ -145,7 +146,7 @@ Pipenv does not read `pyproject.toml`. It reads the `Pipfile`, which carries the
 
 ### Hatch
 
-```bash
+```
 hatch env create
 hatch run pytest
 hatch run ruff check . && hatch run ruff format --check .
@@ -155,7 +156,7 @@ hatch run ruff check . && hatch run ruff format --check .
 
 ### PDM
 
-```bash
+```
 pdm install
 pdm run pytest
 pdm run ruff check . && pdm run ruff format --check .
@@ -237,42 +238,42 @@ Run the ingestion with the block for your tool:
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq pull   # download both into data/raw/station/
 gnostiq build  # parse and merge into data/interim/
 ```
 
 ### uv
 
-```bash
+```
 uv run gnostiq pull   # download both into data/raw/station/
 uv run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run gnostiq pull   # download both into data/raw/station/
 poetry run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run gnostiq pull   # download both into data/raw/station/
 pipenv run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run gnostiq pull   # download both into data/raw/station/
 hatch run gnostiq build  # parse and merge into data/interim/
 ```
 
 ### PDM
 
-```bash
+```
 pdm run gnostiq pull   # download both into data/raw/station/
 pdm run gnostiq build  # parse and merge into data/interim/
 ```
@@ -306,42 +307,42 @@ Run this before any modelling. It answers one question: is the site's record goo
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 python scripts/gate.py              # looks the station up by WMO number
 python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### uv
 
-```bash
+```
 uv run python scripts/gate.py              # looks the station up by WMO number
 uv run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run python scripts/gate.py              # looks the station up by WMO number
 poetry run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run python scripts/gate.py              # looks the station up by WMO number
 pipenv run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run python scripts/gate.py              # looks the station up by WMO number
 hatch run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
 
 ### PDM
 
-```bash
+```
 pdm run python scripts/gate.py              # looks the station up by WMO number
 pdm run python scripts/gate.py NIM00065134  # or name the GHCNh record yourself
 ```
@@ -374,42 +375,42 @@ Past forecasts for the site's grid cell, from Open-Meteo's Previous Runs API. Fo
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq pull --only nwp
 gnostiq build
 ```
 
 ### uv
 
-```bash
+```
 uv run gnostiq pull --only nwp
 uv run gnostiq build
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run gnostiq pull --only nwp
 poetry run gnostiq build
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run gnostiq pull --only nwp
 pipenv run gnostiq build
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run gnostiq pull --only nwp
 hatch run gnostiq build
 ```
 
 ### PDM
 
-```bash
+```
 pdm run gnostiq pull --only nwp
 pdm run gnostiq build
 ```
@@ -471,37 +472,37 @@ When the station gauge is not usable, daily rain truth comes from CHIRPS v3. The
 
 #### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq pull --only precip
 ```
 
 #### uv
 
-```bash
+```
 uv run gnostiq pull --only precip
 ```
 
 #### Poetry
 
-```bash
+```
 poetry run gnostiq pull --only precip
 ```
 
 #### Pipenv
 
-```bash
+```
 pipenv run gnostiq pull --only precip
 ```
 
 #### Hatch
 
-```bash
+```
 hatch run gnostiq pull --only precip
 ```
 
 #### PDM
 
-```bash
+```
 pdm run gnostiq pull --only precip
 ```
 
@@ -521,37 +522,37 @@ CHIRPS daily totals are treated as running 00 to 00 UTC. That is an assumption t
 
 #### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq pull --only static
 ```
 
 #### uv
 
-```bash
+```
 uv run gnostiq pull --only static
 ```
 
 #### Poetry
 
-```bash
+```
 poetry run gnostiq pull --only static
 ```
 
 #### Pipenv
 
-```bash
+```
 pipenv run gnostiq pull --only static
 ```
 
 #### Hatch
 
-```bash
+```
 hatch run gnostiq pull --only static
 ```
 
 #### PDM
 
-```bash
+```
 pdm run gnostiq pull --only static
 ```
 
@@ -572,37 +573,37 @@ Station reports are checked before anything is trained or scored against them. A
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq build
 ```
 
 ### uv
 
-```bash
+```
 uv run gnostiq build
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run gnostiq build
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run gnostiq build
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run gnostiq build
 ```
 
 ### PDM
 
-```bash
+```
 pdm run gnostiq build
 ```
 
@@ -647,37 +648,37 @@ These are the forecasts the model has to beat. They are built before the model e
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq baselines
 ```
 
 ### uv
 
-```bash
+```
 uv run gnostiq baselines
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run gnostiq baselines
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run gnostiq baselines
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run gnostiq baselines
 ```
 
 ### PDM
 
-```bash
+```
 pdm run gnostiq baselines
 ```
 
@@ -706,37 +707,37 @@ Outputs, both under `data/processed/`:
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq verify  # or: gnostiq all
 ```
 
 ### uv
 
-```bash
+```
 uv run gnostiq verify  # or: gnostiq all
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run gnostiq verify  # or: gnostiq all
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run gnostiq verify  # or: gnostiq all
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run gnostiq verify  # or: gnostiq all
 ```
 
 ### PDM
 
-```bash
+```
 pdm run gnostiq verify  # or: gnostiq all
 ```
 
@@ -760,42 +761,42 @@ Every rain system is fitted to CHIRPS, so a rain score is partly a score of agre
 
 #### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq pull --only tamsat  # the test window only, about 1 MB a day
 gnostiq verify
 ```
 
 #### uv
 
-```bash
+```
 uv run gnostiq pull --only tamsat  # the test window only, about 1 MB a day
 uv run gnostiq verify
 ```
 
 #### Poetry
 
-```bash
+```
 poetry run gnostiq pull --only tamsat  # the test window only, about 1 MB a day
 poetry run gnostiq verify
 ```
 
 #### Pipenv
 
-```bash
+```
 pipenv run gnostiq pull --only tamsat  # the test window only, about 1 MB a day
 pipenv run gnostiq verify
 ```
 
 #### Hatch
 
-```bash
+```
 hatch run gnostiq pull --only tamsat  # the test window only, about 1 MB a day
 hatch run gnostiq verify
 ```
 
 #### PDM
 
-```bash
+```
 pdm run gnostiq pull --only tamsat  # the test window only, about 1 MB a day
 pdm run gnostiq verify
 ```
@@ -852,37 +853,37 @@ Use the requirements files with pip only. uv takes a package from the first inde
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq train  # or: gnostiq all
 ```
 
 ### uv
 
-```bash
+```
 uv run gnostiq train  # or: gnostiq all
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run gnostiq train  # or: gnostiq all
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run gnostiq train  # or: gnostiq all
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run gnostiq train  # or: gnostiq all
 ```
 
 ### PDM
 
-```bash
+```
 pdm run gnostiq train  # or: gnostiq all
 ```
 
@@ -910,37 +911,37 @@ On a laptop CPU the default settings take a few minutes.
 
 #### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq curve
 ```
 
 #### uv
 
-```bash
+```
 uv run gnostiq curve
 ```
 
 #### Poetry
 
-```bash
+```
 poetry run gnostiq curve
 ```
 
 #### Pipenv
 
-```bash
+```
 pipenv run gnostiq curve
 ```
 
 #### Hatch
 
-```bash
+```
 hatch run gnostiq curve
 ```
 
 #### PDM
 
-```bash
+```
 pdm run gnostiq curve
 ```
 
@@ -952,37 +953,37 @@ It writes `data/reports/curve.md` and `curve.json`. Read `vs emos` down the tabl
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq cases  # or: gnostiq all
 ```
 
 ### uv
 
-```bash
+```
 uv run gnostiq cases  # or: gnostiq all
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run gnostiq cases  # or: gnostiq all
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run gnostiq cases  # or: gnostiq all
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run gnostiq cases  # or: gnostiq all
 ```
 
 ### PDM
 
-```bash
+```
 pdm run gnostiq cases  # or: gnostiq all
 ```
 
@@ -998,37 +999,37 @@ A scorecard tells you about the average day. These tell you what the system said
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq run
 ```
 
 ### uv
 
-```bash
+```
 uv run gnostiq run
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run gnostiq run
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run gnostiq run
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run gnostiq run
 ```
 
 ### PDM
 
-```bash
+```
 pdm run gnostiq run
 ```
 
@@ -1056,37 +1057,37 @@ The file is written to a temporary name and renamed, so the web server never rea
 
 #### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq check
 ```
 
 #### uv
 
-```bash
+```
 uv run gnostiq check
 ```
 
 #### Poetry
 
-```bash
+```
 poetry run gnostiq check
 ```
 
 #### Pipenv
 
-```bash
+```
 pipenv run gnostiq check
 ```
 
 #### Hatch
 
-```bash
+```
 hatch run gnostiq check
 ```
 
 #### PDM
 
-```bash
+```
 pdm run gnostiq check
 ```
 
@@ -1109,37 +1110,37 @@ On a server, `deploy/gnostiq-check.timer` runs it every morning.
 
 #### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq pull --only nimet  # not part of a plain pull
 ```
 
 #### uv
 
-```bash
+```
 uv run gnostiq pull --only nimet  # not part of a plain pull
 ```
 
 #### Poetry
 
-```bash
+```
 poetry run gnostiq pull --only nimet  # not part of a plain pull
 ```
 
 #### Pipenv
 
-```bash
+```
 pipenv run gnostiq pull --only nimet  # not part of a plain pull
 ```
 
 #### Hatch
 
-```bash
+```
 hatch run gnostiq pull --only nimet  # not part of a plain pull
 ```
 
 #### PDM
 
-```bash
+```
 pdm run gnostiq pull --only nimet  # not part of a plain pull
 ```
 
@@ -1161,7 +1162,7 @@ The node timed out from at least one Nigerian home connection while answering fr
 
 #### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq season                                      # the latest wet season with a month in it
 gnostiq season --start 2026-04-01 --end 2026-10-31
 gnostiq season --all-sites
@@ -1169,7 +1170,7 @@ gnostiq season --all-sites
 
 #### uv
 
-```bash
+```
 uv run gnostiq season                                      # the latest wet season with a month in it
 uv run gnostiq season --start 2026-04-01 --end 2026-10-31
 uv run gnostiq season --all-sites
@@ -1177,7 +1178,7 @@ uv run gnostiq season --all-sites
 
 #### Poetry
 
-```bash
+```
 poetry run gnostiq season                                      # the latest wet season with a month in it
 poetry run gnostiq season --start 2026-04-01 --end 2026-10-31
 poetry run gnostiq season --all-sites
@@ -1185,7 +1186,7 @@ poetry run gnostiq season --all-sites
 
 #### Pipenv
 
-```bash
+```
 pipenv run gnostiq season                                      # the latest wet season with a month in it
 pipenv run gnostiq season --start 2026-04-01 --end 2026-10-31
 pipenv run gnostiq season --all-sites
@@ -1193,7 +1194,7 @@ pipenv run gnostiq season --all-sites
 
 #### Hatch
 
-```bash
+```
 hatch run gnostiq season                                      # the latest wet season with a month in it
 hatch run gnostiq season --start 2026-04-01 --end 2026-10-31
 hatch run gnostiq season --all-sites
@@ -1201,7 +1202,7 @@ hatch run gnostiq season --all-sites
 
 #### PDM
 
-```bash
+```
 pdm run gnostiq season                                      # the latest wet season with a month in it
 pdm run gnostiq season --start 2026-04-01 --end 2026-10-31
 pdm run gnostiq season --all-sites
@@ -1217,13 +1218,78 @@ Read it with three things in mind:
 - The report states how far the NiMet station is from the forecast point. For Jos that is 25 km on the listed position.
 - ECMWF changed the IFS cycle on 12 May 2026, partway through the 2026 season, and the networks were trained on the old one. `by_month` shows whether skill shifts across that date.
 
+### Public record on Auto Drive
+
+#### Standard Python (`venv` / `virtualenv`)
+
+```
+gnostiq publish --all-sites            # a dry run until AUTO_DRIVE_API_KEY is set
+gnostiq verify-record <cid>            # anyone; needs no config, data or key
+gnostiq verify-record <cid> --depth 7
+```
+
+#### uv
+
+```
+uv run gnostiq publish --all-sites            # a dry run until AUTO_DRIVE_API_KEY is set
+uv run gnostiq verify-record <cid>            # anyone; needs no config, data or key
+uv run gnostiq verify-record <cid> --depth 7
+```
+
+#### Poetry
+
+```
+poetry run gnostiq publish --all-sites            # a dry run until AUTO_DRIVE_API_KEY is set
+poetry run gnostiq verify-record <cid>            # anyone; needs no config, data or key
+poetry run gnostiq verify-record <cid> --depth 7
+```
+
+#### Pipenv
+
+```
+pipenv run gnostiq publish --all-sites            # a dry run until AUTO_DRIVE_API_KEY is set
+pipenv run gnostiq verify-record <cid>            # anyone; needs no config, data or key
+pipenv run gnostiq verify-record <cid> --depth 7
+```
+
+#### Hatch
+
+```
+hatch run gnostiq publish --all-sites            # a dry run until AUTO_DRIVE_API_KEY is set
+hatch run gnostiq verify-record <cid>            # anyone; needs no config, data or key
+hatch run gnostiq verify-record <cid> --depth 7
+```
+
+#### PDM
+
+```
+pdm run gnostiq publish --all-sites            # a dry run until AUTO_DRIVE_API_KEY is set
+pdm run gnostiq verify-record <cid>            # anyone; needs no config, data or key
+pdm run gnostiq verify-record <cid> --depth 7
+```
+
+`publish` stores the first forecast of each UTC day, the one the live check scores, on Autonomys Auto Drive, with a record beside it: the forecast's CID and SHA-256, when it was issued and uploaded, the site, hashes of the trained networks and of `gnostiq.toml`, the package version and commit, the input models, the training window and truth sources, and the CID of the site's previous record. Each record names the one before it, so the latest CID reaches every earlier one, and none can be changed without the next one still naming the original.
+
+`run` keeps the forecast's own bytes as `archive/<init>.json.gz`, gzipped with a fixed timestamp so the same forecast is always the same CID; that file is what gets uploaded. Days missed up to three days back are caught up (`--days` changes that). The site's `reports/records.json` lists every record, the latest CID and the bytes stored, copies go to `published/`, and the page shows the latest record under the forecast.
+
+Without the key nothing leaves the machine: `publish` writes the record it would have stored to `published/<day>.dry-run.json`. Uploads are permanent and count against the account's monthly upload allowance, 20 MB on the free tier, so try the dry run first. One forecast and record come to about 14 KB, under 1 MB a month for both sites. Get a key at ai3.storage under Developers, then:
+
+```
+export AUTO_DRIVE_API_KEY=...  # Git Bash; on the server see Deploy
+gnostiq publish --all-sites
+```
+
+Publish from one place only. Two machines publishing the same site each start their own chain, and the same day is stored twice.
+
+`verify-record` fetches each record and its forecast from the public gateway, checks the forecast against its hash and that it is the issue and site the record says, and follows `previous`. It exits 1 if any record fails. [docs/PROVENANCE.md](docs/PROVENANCE.md) has the record format, how to check one with `curl` and `sha256sum` alone, and storage needs.
+
 ### A second site: Jos
 
 Jos failed the gate: its synoptic record stops in 2021 and the airport reports only by day. Nothing can be trained or scored there, so its table in `gnostiq.toml` has `borrow = "abuja"` (see Sites without a record under Configuration). Its forecast is Abuja's networks run on Jos's own ECMWF forecast, after the terrain correction for Jos's height. The model grid sits well below the plateau (1182 m for the cell the old Jos point fell in, against 1290 m at the airport), where at Abuja the gap is 23 m, so the height step does more work here. `pull` measures the height of the cell actually used.
 
 #### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq --site jos pull    # only the terrain height; nothing else is needed
 gnostiq --site jos run
 gnostiq --site jos check
@@ -1234,7 +1300,7 @@ gnostiq check --all-sites
 
 #### uv
 
-```bash
+```
 uv run gnostiq --site jos pull    # only the terrain height; nothing else is needed
 uv run gnostiq --site jos run
 uv run gnostiq --site jos check
@@ -1245,7 +1311,7 @@ uv run gnostiq check --all-sites
 
 #### Poetry
 
-```bash
+```
 poetry run gnostiq --site jos pull    # only the terrain height; nothing else is needed
 poetry run gnostiq --site jos run
 poetry run gnostiq --site jos check
@@ -1256,7 +1322,7 @@ poetry run gnostiq check --all-sites
 
 #### Pipenv
 
-```bash
+```
 pipenv run gnostiq --site jos pull    # only the terrain height; nothing else is needed
 pipenv run gnostiq --site jos run
 pipenv run gnostiq --site jos check
@@ -1267,7 +1333,7 @@ pipenv run gnostiq check --all-sites
 
 #### Hatch
 
-```bash
+```
 hatch run gnostiq --site jos pull    # only the terrain height; nothing else is needed
 hatch run gnostiq --site jos run
 hatch run gnostiq --site jos check
@@ -1278,7 +1344,7 @@ hatch run gnostiq check --all-sites
 
 #### PDM
 
-```bash
+```
 pdm run gnostiq --site jos pull    # only the terrain height; nothing else is needed
 pdm run gnostiq --site jos run
 pdm run gnostiq --site jos check
@@ -1295,42 +1361,42 @@ What this does and does not show. It is not verified at Jos. The networks learne
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 gnostiq serve                             # http://127.0.0.1:8000
 gnostiq serve --host 0.0.0.0 --port 8080
 ```
 
 ### uv
 
-```bash
+```
 uv run gnostiq serve                             # http://127.0.0.1:8000
 uv run gnostiq serve --host 0.0.0.0 --port 8080
 ```
 
 ### Poetry
 
-```bash
+```
 poetry run gnostiq serve                             # http://127.0.0.1:8000
 poetry run gnostiq serve --host 0.0.0.0 --port 8080
 ```
 
 ### Pipenv
 
-```bash
+```
 pipenv run gnostiq serve                             # http://127.0.0.1:8000
 pipenv run gnostiq serve --host 0.0.0.0 --port 8080
 ```
 
 ### Hatch
 
-```bash
+```
 hatch run gnostiq serve                             # http://127.0.0.1:8000
 hatch run gnostiq serve --host 0.0.0.0 --port 8080
 ```
 
 ### PDM
 
-```bash
+```
 pdm run gnostiq serve                             # http://127.0.0.1:8000
 pdm run gnostiq serve --host 0.0.0.0 --port 8080
 ```
@@ -1374,7 +1440,7 @@ After setting up with your tool as described under Setup:
 
 ### Standard Python (`venv` / `virtualenv`)
 
-```bash
+```
 python scripts/gate.py                           # then change the keys it lists in gnostiq.toml
 gnostiq pull                                     # everything; safe to re-run
 gnostiq pull --only tamsat                       # optional: a second rain truth for the scorecard
@@ -1387,7 +1453,7 @@ gnostiq serve                                    # http://127.0.0.1:8000
 
 ### uv
 
-```bash
+```
 uv run python scripts/gate.py                           # then change the keys it lists in gnostiq.toml
 uv run gnostiq pull                                     # everything; safe to re-run
 uv run gnostiq pull --only tamsat                       # optional: a second rain truth for the scorecard
@@ -1400,7 +1466,7 @@ uv run gnostiq serve                                    # http://127.0.0.1:8000
 
 ### Poetry
 
-```bash
+```
 poetry run python scripts/gate.py                           # then change the keys it lists in gnostiq.toml
 poetry run gnostiq pull                                     # everything; safe to re-run
 poetry run gnostiq pull --only tamsat                       # optional: a second rain truth for the scorecard
@@ -1413,7 +1479,7 @@ poetry run gnostiq serve                                    # http://127.0.0.1:8
 
 ### Pipenv
 
-```bash
+```
 pipenv run python scripts/gate.py                           # then change the keys it lists in gnostiq.toml
 pipenv run gnostiq pull                                     # everything; safe to re-run
 pipenv run gnostiq pull --only tamsat                       # optional: a second rain truth for the scorecard
@@ -1426,7 +1492,7 @@ pipenv run gnostiq serve                                    # http://127.0.0.1:8
 
 ### Hatch
 
-```bash
+```
 hatch run python scripts/gate.py                           # then change the keys it lists in gnostiq.toml
 hatch run gnostiq pull                                     # everything; safe to re-run
 hatch run gnostiq pull --only tamsat                       # optional: a second rain truth for the scorecard
@@ -1439,7 +1505,7 @@ hatch run gnostiq serve                                    # http://127.0.0.1:80
 
 ### PDM
 
-```bash
+```
 pdm run python scripts/gate.py                           # then change the keys it lists in gnostiq.toml
 pdm run gnostiq pull                                     # everything; safe to re-run
 pdm run gnostiq pull --only tamsat                       # optional: a second rain truth for the scorecard
@@ -1506,6 +1572,15 @@ The run timer refreshes the forecast for every site every three hours and saves 
 
 To check it: `curl localhost:8000/api/health` shows when the forecast was issued, and `journalctl -u gnostiq-run` shows the last run.
 
+To store each day's first forecast on Auto Drive (see Public record on Auto Drive), put the key where the run unit reads it:
+
+```
+echo 'AUTO_DRIVE_API_KEY=<key>' | sudo tee /etc/gnostiq.env
+sudo chmod 600 /etc/gnostiq.env
+```
+
+The run unit publishes after every forecast; without the file it does a dry run. Records name the git commit; if `git` cannot read the checkout as the `gnostiq` user, add `GNOSTIQ_COMMIT=<sha>` to the same file. `journalctl -u gnostiq-run` shows each record's CID, and `data/<site>/reports/records.json` lists them all.
+
 CI is in `.github/workflows/ci.yml`: lint and tests on every push and pull request. It installs without a lock file, so commit `uv.lock` and change the step to `uv sync --locked` once the stack is merged.
 
 ## Keeping it current
@@ -1531,6 +1606,7 @@ The pipeline has run end to end on real data for Abuja, with the 2025 wet season
 | IEM METARs | Yes | Works; Nigerian reports thin out from April 2026 |
 | NiMet WIS2 node | Yes | Works from a cloud browser; timed out from one home connection |
 | TAMSAT v3.1 | Partly | File names and sizes seen in the archive index; no file read yet |
+| Auto Drive S3 upload and gateway | No | Built from Autonomys's documentation; not yet run with a key |
 
 ## Assumptions to check on real data
 
@@ -1538,7 +1614,8 @@ The pipeline has run end to end on real data for Abuja, with the 2025 wet season
 2. **CHIRPS day boundary.** Daily totals are treated as 00 to 00 UTC. If the product's day is offset, forecast and truth are misaligned by some hours.
 3. **Station identity.** If the gate says the synoptic and METAR temperatures come from a "different site or sensor", `truth.temp = "merged"` mixes two instruments. Use `ghcnh` or `iem` alone.
 4. **Station height.** The terrain correction is station height minus the model's 1182 m. At the listed 1295 m the model is cooled by about 0.7 degC. If the gate's barometer estimate disagrees with 1295 m, fix the site's `elev_m` before training.
-5. **Open-Meteo licence.** The free API is non-commercial. A commercial service needs their paid plan or your own ingest of ECMWF open data.
+5. **Auto Drive CID.** `publish` reads the CID from the upload response's `x-amz-meta-cid` header, or `VersionId`. If the first real upload stops with "returned no CID", the response carries it elsewhere; nothing is lost, since the record is not written until the forecast's CID is known, but the forecast itself is already stored.
+6. **Open-Meteo licence.** The free API is non-commercial. A commercial service needs their paid plan or your own ingest of ECMWF open data.
 
 ## Known gaps
 

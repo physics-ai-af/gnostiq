@@ -1,3 +1,4 @@
+import gzip
 import json
 import shutil
 
@@ -63,8 +64,10 @@ def test_run_writes_the_document_atomically(trained, monkeypatch):
     path = c.paths.reports / "forecast.json"
     assert json.loads(path.read_text()) == doc and not list(c.paths.reports.glob("*.part"))
     assert doc["hourly"] and doc["site"]["name"] == c.site.name
-    saved = pd.read_parquet(c.paths.archive / f"{pd.Timestamp(doc['init_utc'].rstrip('Z')):%Y%m%dT%H}.parquet")
-    assert saved.equals(run.issued(doc))
+    stem = c.paths.archive / f"{pd.Timestamp(doc['init_utc'].rstrip('Z')):%Y%m%dT%H}"
+    assert pd.read_parquet(stem.with_suffix(".parquet")).equals(run.issued(doc))
+    # the page's own bytes, kept for the public record
+    assert gzip.decompress(stem.with_suffix(".json.gz").read_bytes()) == path.read_bytes()
 
 
 def test_the_forecast_carries_other_models_and_the_normal_range(trained):

@@ -30,11 +30,13 @@ def test_reports_are_served_as_written(site):
         "cases.json": {"cases": []},
         "live.json": {"site": "jos", "vars": {}},
         "season.json": {"site": "jos", "window": ["2026-04-01", "2026-10-31"]},
+        "records.json": {"site": "jos", "records": [], "latest": None},
     }
     for name, doc in docs.items():
         (c.paths.reports / name).write_text(json.dumps(doc))
     pairs = [("/api/forecast", "forecast.json"), ("/api/verify", "scorecard.json"), ("/api/cases", "cases.json"),
-             ("/api/live", "live.json"), ("/api/jos/season", "season.json")]  # fmt: skip
+             ("/api/live", "live.json"), ("/api/jos/season", "season.json"),
+             ("/api/jos/records", "records.json")]  # fmt: skip
     for url, name in pairs:
         r = client.get(url)
         assert r.status_code == 200 and r.json() == docs[name] and "max-age" in r.headers["cache-control"]
