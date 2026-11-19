@@ -4,7 +4,7 @@ import shutil
 import pandas as pd
 import pytest
 import synth
-from conftest import SMALL, SYNTH_END, write_cfg, write_nearby
+from conftest import SMALL, SYNTH_END, add_nearby, write_cfg
 from fastapi.testclient import TestClient
 
 from gnostiq import api, cfg, cli, verify
@@ -82,15 +82,14 @@ def test_live_forecast_reaches_the_page(repo):
 
 def test_a_second_site_runs_on_the_first_sites_networks(repo):
     c, mp = repo
-    path = write_nearby(c.source.parent)
+    near = add_nearby(c.source.parent)
     init = pd.Timestamp.now("UTC").tz_localize(None).floor("h")
     mp.setattr(nwp, "live", lambda c, days=9: (synth.live_frame(c, init), 1182.0))
     mp.setattr(nwp, "live_extra", lambda c, days=9: {})
-    near = cfg.load(path)
     near.paths.ensure()
     (near.paths.processed / "static.json").write_text((c.paths.processed / "static.json").read_text())
     with pytest.raises(SystemExit, match="no record of its own"):
-        cli.main(["--config", str(path), "train"])
+        cli.main(["--site", "nearby", "train"])
     cli.main(["run", "--all-sites"])
 
     client = TestClient(api.create(c))

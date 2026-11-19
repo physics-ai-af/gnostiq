@@ -1,5 +1,5 @@
 import pytest
-from conftest import DEFAULT, LIVE, NEARBY, write_cfg, write_nearby
+from conftest import DEFAULT, LIVE, NEARBY, add_nearby, write_cfg
 
 from gnostiq import cfg
 
@@ -11,9 +11,9 @@ def test_default_loads():
     assert c.truth.rain_h0 == 0
 
 
-def test_the_repo_configs_are_valid():
+def test_the_repo_config_is_valid_for_every_site():
     sites = cfg.sites(cfg.load(LIVE))
-    assert len({x.site.name for x in sites}) == len(sites)
+    assert len({x.site.name for x in sites}) == len(sites) >= 1
 
 
 @pytest.mark.parametrize(
@@ -40,8 +40,8 @@ def test_the_repo_configs_are_valid():
         ("start = 2024-01-01", "start = 2019-01-01", "nwp.start"),
         ("heavy_mm = 10.0", "heavy_mm = 0.5", "thresholds"),
         ("seeds = 3", "seeds = 0", "model settings"),
-        ('icao = "DNJO"\n', "", "missing site.icao"),
-        ('name = "jos"', 'name = "Jos Plateau"', "site.name"),
+        ('icao = "DNJO"\n', "", "missing sites.jos.icao"),
+        ("[sites.jos]", '[sites."Jos Plateau"]', "site names"),
     ],
 )
 def test_rejects(tmp_path, old, new, msg):
@@ -69,7 +69,7 @@ def test_find_walks_up(tmp_path, monkeypatch):
 
 
 def test_env_override(tmp_path, monkeypatch):
-    p = write_cfg(tmp_path, {'name = "jos"': 'name = "jos-alt"'})
+    p = write_cfg(tmp_path, {"[sites.jos]": "[sites.jos-alt]"})
     monkeypatch.setenv("GNOSTIQ_CFG", str(p))
     cfg.get.cache_clear()
     try:
@@ -78,23 +78,26 @@ def test_env_override(tmp_path, monkeypatch):
         cfg.get.cache_clear()
 
 
-def test_a_borrowing_site_takes_everything_but_site_and_paths_from_its_donor(tmp_path):
+def test_a_borrowing_site_has_its_own_table_and_shares_the_rest(tmp_path):
     donor = cfg.load(write_cfg(tmp_path))
-    c = cfg.load(write_nearby(tmp_path))
+    c = add_nearby(tmp_path)
     assert c.donor == "jos" and c.site.name == "nearby" and c.site.elev == 1400.0
     assert c.paths.models == donor.paths.models and c.paths.reports == tmp_path / "nearby" / "reports"
+    assert c.paths.trained == donor.paths.processed
     assert (c.window, c.truth, c.nwp, c.lead_days, c.model) == (donor.window, donor.truth, donor.nwp, donor.lead_days,
                                                                 donor.model)  # fmt: skip
     assert donor.donor == "" and donor.paths.models == tmp_path / "data" / "models"
+    # the first site is the default
+    assert cfg.load(c.source).site.name == "jos"
 
 
 @pytest.mark.parametrize(
     "edit, msg",
     [
-        ({"[paths]": "[window]\nstart = 2021-01-01\n\n[paths]"}, "set only"),
-        ({'from = "gnostiq.toml"': 'from = "gnostiq.toml"\nseeds = 1'}, "model.seeds"),
-        ({'data = "nearby"': 'data = "data"'}, "data directory"),
-        ({'name = "nearby"': 'name = "jos"'}, "same site name"),
+        ({'data = "nearby"': 'data = "data"'}, "shared with another site"),
+        ({'borrow = "jos"': 'borrow = "nearby"'}, "must name another site"),
+        ({'borrow = "jos"': 'borrow = "lagos"'}, "must name another site"),
+        ({'tz = "Africa/Lagos"\n': ""}, "missing sites.nearby.tz"),
         ({"lat = 9.64": "lat = 12.0"}, "outside bbox"),
     ],
 )
@@ -104,24 +107,34 @@ def test_a_borrowing_site_is_checked(tmp_path, edit, msg):
     for old, new in edit.items():
         text = text.replace(old, new)
     with pytest.raises(ValueError, match=msg):
-        cfg.load(write_nearby(tmp_path, text))
+        add_nearby(tmp_path, text)
 
 
 def test_borrowing_does_not_chain(tmp_path):
     write_cfg(tmp_path)
-    write_nearby(tmp_path)
-    p = tmp_path / "gnostiq-third.toml"
-    p.write_text(NEARBY.replace('"nearby"', '"third"').replace("gnostiq.toml", "gnostiq-nearby.toml"))
-    with pytest.raises(ValueError, match="borrows its networks too"):
-        cfg.load(p)
+    add_nearby(tmp_path)
+    third = NEARBY.replace("[sites.nearby]", "[sites.third]").replace('"nearby"', '"third"')
+    third = third.replace('borrow = "jos"', 'borrow = "nearby"')
+    p = tmp_path / cfg.FILENAME
+    p.write_text(p.read_text() + third)
+    with pytest.raises(ValueError, match="which borrows too"):
+        cfg.load(p, "third")
 
 
-def test_sites_are_found_beside_the_config(tmp_path):
+def test_sites_come_from_the_one_file_in_order(tmp_path, monkeypatch):
     c = cfg.load(write_cfg(tmp_path))
     assert [x.site.name for x in cfg.sites(c)] == ["jos"]
-    near = cfg.load(write_nearby(tmp_path))
+    near = add_nearby(tmp_path)
     assert [x.site.name for x in cfg.sites(c)] == ["jos", "nearby"]
     assert [x.site.name for x in cfg.sites(near)] == ["nearby", "jos"]
-    (tmp_path / "gnostiq-copy.toml").write_text(NEARBY.replace('data = "nearby"', 'data = "copy"'))
-    with pytest.raises(ValueError, match="more than one config .* for nearby"):
-        cfg.sites(c)
+    monkeypatch.setenv("GNOSTIQ_SITE", "nearby")
+    assert cfg.load(c.source).site.name == "nearby"
+    with pytest.raises(ValueError, match="no site 'lagos'; it has jos, nearby"):
+        cfg.load(c.source, "lagos")
+
+
+def test_a_file_without_sites_is_refused(tmp_path):
+    p = write_cfg(tmp_path)
+    p.write_text(p.read_text().split("[sites.jos]")[0])
+    with pytest.raises(ValueError, match=r"no \[sites.<name>\] table"):
+        cfg.load(p)

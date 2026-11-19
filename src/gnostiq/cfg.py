@@ -157,26 +157,16 @@ def read(path):
         return tomllib.load(f)
 
 
-def load(path=None):
+def load(path=None, site=None):
     path = Path(path or find()).resolve()
     raw = read(path)
-    donor, home = "", None
-    src = raw.get("model", {}).get("from")
-    if src:
-        # the networks only hold where window, truth, inputs and leads match their training, so all of it comes from src
-        extra = sorted(set(raw) - {"site", "paths", "model"}) + [f"model.{k}" for k in raw["model"] if k != "from"]
-        if extra:
-            raise ValueError(f"{path}: borrows its networks from {src}, so set only [site] and [paths]: {extra}")
-        base = read(path.parent / src)
-        if "from" in base.get("model", {}):
-            raise ValueError(f"{path}: {src} borrows its networks too")
-        d = load(path.parent / src)
-        if d.paths.data == (path.parent / raw.get("paths", {}).get("data", "")).resolve():
-            raise ValueError(f"{path}: shares its data directory with {src}")
-        if d.site.name == raw.get("site", {}).get("name"):
-            raise ValueError(f"{path}: has the same site name as {src}")
-        raw = {**base, "site": raw.get("site", {}), "paths": raw.get("paths", {})}
-        donor, home = d.site.name, d.paths.data
+    tables = raw.get("sites") or {}
+    if not tables:
+        raise ValueError(f"{path}: no [sites.<name>] table")
+    name = site or os.environ.get("GNOSTIQ_SITE") or next(iter(tables))
+    if name not in tables:
+        raise ValueError(f"{path}: no site {name!r}; it has {', '.join(tables)}")
+    t = tables[name]
 
     def need(section, key):
         try:
@@ -184,16 +174,33 @@ def load(path=None):
         except KeyError:
             raise ValueError(f"{path}: missing {section}.{key}") from None
 
+    def own(key):
+        try:
+            return t[key]
+        except KeyError:
+            raise ValueError(f"{path}: missing sites.{name}.{key}") from None
+
+    donor = t.get("borrow", "")
+    if donor:
+        # the networks only hold where window, truth, inputs and leads match their training; shared settings ensure it
+        if donor == name or donor not in tables:
+            raise ValueError(f"{path}: sites.{name}.borrow must name another site: {donor!r}")
+        if tables[donor].get("borrow"):
+            raise ValueError(f"{path}: sites.{name} borrows from {donor}, which borrows too")
+    data = {n: (path.parent / x.get("data", "")).resolve() for n, x in tables.items()}
+    if list(data.values()).count(data[name]) > 1:
+        raise ValueError(f"{path}: sites.{name}.data is shared with another site")
+
     site = Site(
-        name=need("site", "name"),
-        wmo=str(need("site", "wmo")),
-        icao=need("site", "icao"),
-        ghcnh=raw["site"].get("ghcnh", ""),
-        lat=float(need("site", "lat")),
-        lon=float(need("site", "lon")),
-        elev=float(need("site", "elev_m")),
-        tz=need("site", "tz"),
-        bbox=tuple(float(x) for x in need("site", "bbox")),
+        name=name,
+        wmo=str(own("wmo")),
+        icao=own("icao"),
+        ghcnh=t.get("ghcnh", ""),
+        lat=float(own("lat")),
+        lon=float(own("lon")),
+        elev=float(own("elev_m")),
+        tz=own("tz"),
+        bbox=tuple(float(x) for x in own("bbox")),
     )
     win = Window(
         start=need("window", "start"),
@@ -230,7 +237,7 @@ def load(path=None):
         wet_mm=float(need("forecast", "wet_mm")),
         heavy_mm=float(need("forecast", "heavy_mm")),
         model=model,
-        paths=Paths((path.parent / need("paths", "data")).resolve(), home),
+        paths=Paths((path.parent / own("data")).resolve(), data[donor] if donor else None),
         source=path,
         donor=donor,
     )
@@ -245,21 +252,21 @@ def check(c):
     s, w = c.site, c.window
 
     if not re.fullmatch(r"[a-z][a-z0-9_-]*", s.name):
-        errs.append(f"site.name must be lowercase letters, digits, - or _, as it goes in URLs: {s.name}")
+        errs.append(f"site names must be lowercase letters, digits, - or _, as they go in URLs: {s.name}")
     if len(s.bbox) != 4:
-        errs.append("site.bbox needs 4 values: lat0, lat1, lon0, lon1")
+        errs.append(f"sites.{s.name}.bbox needs 4 values: lat0, lat1, lon0, lon1")
     else:
         lat0, lat1, lon0, lon1 = s.bbox
         if not (lat0 < lat1 and lon0 < lon1):
-            errs.append(f"site.bbox not ordered: {s.bbox}")
+            errs.append(f"sites.{s.name}.bbox not ordered: {s.bbox}")
         if not (lat0 <= s.lat <= lat1 and lon0 <= s.lon <= lon1):
-            errs.append(f"site ({s.lat}, {s.lon}) outside bbox {s.bbox}")
+            errs.append(f"sites.{s.name} ({s.lat}, {s.lon}) outside bbox {s.bbox}")
     if not 0 <= s.elev <= 6000:
-        errs.append(f"site.elev_m implausible: {s.elev}")
+        errs.append(f"sites.{s.name}.elev_m implausible: {s.elev}")
     try:
         ZoneInfo(s.tz)
     except (ZoneInfoNotFoundError, ValueError):
-        errs.append(f"site.tz unknown: {s.tz}")
+        errs.append(f"sites.{s.name}.tz unknown: {s.tz}")
 
     dates = [w.start, w.train_end, w.test_start, w.test_end, c.nwp.start]
     if not all(isinstance(d, date) for d in dates):
@@ -300,17 +307,9 @@ def check(c):
 
 
 def sites(c):
-    # this config first, then gnostiq.toml and every gnostiq-*.toml beside it
-    d = c.source.parent
-    out = [c]
-    for p in [d / FILENAME, *sorted(d.glob("gnostiq-*.toml"))]:
-        if p.is_file() and p.resolve() != c.source:
-            out.append(load(p))
-    names = [x.site.name for x in out]
-    dup = sorted({n for n in names if names.count(n) > 1})
-    if dup:
-        raise ValueError(f"more than one config in {c.source.parent} for {', '.join(dup)}")
-    return out
+    # every site in the same file, this one first
+    names = list(read(c.source)["sites"])
+    return [c, *(load(c.source, n) for n in names if n != c.site.name)]
 
 
 @functools.cache

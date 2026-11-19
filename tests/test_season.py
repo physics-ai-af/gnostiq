@@ -3,9 +3,9 @@ import shutil
 import pandas as pd
 import pytest
 import synth
-from conftest import SYNTH_END, write_nearby
+from conftest import SYNTH_END, add_nearby, drop_nearby
 
-from gnostiq import cfg, season
+from gnostiq import season
 from gnostiq.ingest import nimet
 
 START, END = "2025-04-01", "2025-06-30"
@@ -51,7 +51,7 @@ def test_the_default_is_the_latest_wet_season_with_a_month_in_it(trained):
 
 
 def test_a_borrowing_site_is_scored_with_its_donors_fits(trained, reports):
-    c = cfg.load(write_nearby(trained.source.parent))
+    c = add_nearby(trained.source.parent)
     c.paths.ensure()
     shutil.copytree(trained.paths.raw / "nwp", c.paths.raw / "nwp")
     shutil.copy(trained.paths.processed / "static.json", c.paths.processed / "static.json")
@@ -59,7 +59,7 @@ def test_a_borrowing_site_is_scored_with_its_donors_fits(trained, reports):
         out = season.run(c, START, END)
     finally:
         shutil.rmtree(c.paths.data)
-        (trained.source.parent / "gnostiq-nearby.toml").unlink()
+        drop_nearby(trained.source.parent)
     t = out["vars"]["t2m"]
     assert out["trained_at"] == "jos" and out["site"] == "nearby"
     # no station record of its own, so no climatology; EMOS comes from where the networks were trained

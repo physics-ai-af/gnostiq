@@ -2,7 +2,7 @@
 
 A correction layer for global weather model forecasts at a site. It takes the ECMWF forecast for the grid cell over the site, corrects it for the terrain and puts an uncertainty range on it. The result is checked against station observations from a wet season the model never saw, next to the standard baselines.
 
-It runs for two sites in Nigeria. Abuja (`gnostiq.toml`) has a station record good enough to train and score on. Jos (`gnostiq-jos.toml`) does not, so it runs Abuja's networks on its own forecast and height; its only checks are NiMet's 2026 reports and the live check, and the page says so.
+It runs for two sites in Nigeria. Both are in `gnostiq.toml`. Abuja has a station record good enough to train and score on. Jos does not, so it runs Abuja's networks on its own forecast and height; its only checks are NiMet's 2026 reports and the live check, and the page says so.
 
 The tests use synthetic files written in the real on-disk formats. They show the code works, not that the forecasts are any good; the scorecard does that.
 
@@ -58,7 +58,7 @@ No test touches the network. Downloads are replaced with stand-ins, and anything
 | Path | What it checks |
 |---|---|
 | `tests/conftest.py` | Shared fixtures: config writer, and from later branches the staged synthetic data |
-| `tests/data/gnostiq.toml` | Frozen copy of the Jos config that the fixtures edit, so changing site leaves the tests alone |
+| `tests/data/gnostiq.toml` | Frozen one-site config that the fixtures edit, so changing the real sites leaves the tests alone |
 | `tests/test_cfg.py` | Config loading, lookup order, every validation rule, sites that borrow another's networks |
 | `tests/test_io.py` | Caching, refresh by age, retries, missing files, fallback to a stale copy |
 | `tests/test_requirements.py` | requirements files and Pipfile match pyproject.toml, with pins inside its ranges |
@@ -173,15 +173,12 @@ Add it to `pyproject.toml`. Then add the same pin to `requirements.txt` (or `req
 
 ## Configuration
 
-Everything that describes the run lives in `gnostiq.toml` at the repo root. Code never hard-codes the site, the dates or the model. The values below are Abuja's.
+Everything that describes the run lives in one file, `gnostiq.toml` at the repo root. Code never hard-codes the site, the dates or the model. Settings shared by every site come first; then each site has a table of its own. The values below are the repo's.
+
+Shared:
 
 | Key | Value | Notes |
 |---|---|---|
-| `site.name` | `abuja` | Lowercase; it goes in URLs |
-| `site.lat`, `lon`, `elev_m` | 9.0068, 7.2632, 342 | From the gate |
-| `site.wmo`, `icao` | 65125, DNAA | The synoptic station and the airport |
-| `site.ghcnh` | `NIM00065125` | NOAA station id. Empty means look it up from the WMO number. |
-| `site.bbox` | 8.8 to 9.2 N, 7.0 to 7.5 E | Search box for station records |
 | `window.start` | 2021-01-01 | Start of the observation record |
 | `window.train_end`, `test_start`, `test_end` | 2025-03-31, 2025-04-01, 2025-10-31 | The test window is the 2025 wet season. It must never overlap training. |
 | `truth.temp` | `ghcnh` | `ghcnh`, `iem`, or `merged` (station first, METAR fills gaps) |
@@ -194,28 +191,35 @@ Everything that describes the run lives in `gnostiq.toml` at the repo root. Code
 | `forecast.lead_days` | 1 to 7 | |
 | `forecast.wet_mm`, `heavy_mm` | 1, 10 | Rain thresholds |
 | `model.*` | 3 seeds, 64 hidden units | Small on purpose |
-| `paths.data` | `data/abuja` | Relative to the config file. Git ignores `data/`. |
 
-The file is found by walking up from the working directory, through the `GNOSTIQ_CFG` environment variable, or with `gnostiq --config <file>`. `cfg.load()` validates it and reports every problem in one error, so you fix the file once rather than once per mistake.
+Per site, in `[sites.<name>]`:
 
-### More sites
+| Key | Abuja | Jos | Notes |
+|---|---|---|---|
+| table name | `abuja` | `jos` | Lowercase; it goes in URLs |
+| `lat`, `lon`, `elev_m` | 9.0068, 7.2632, 342 | 9.6398, 8.8691, 1289.9 | From the gate |
+| `wmo`, `icao` | 65125, DNAA | 65134, DNJO | The synoptic station and the airport |
+| `ghcnh` | `NIM00065125` | `NII0000DNJO` | NOAA station id. Empty means look it up from the WMO number. |
+| `bbox` | 8.8 to 9.2 N, 7.0 to 7.5 E | 9.4 to 10.1 N, 8.6 to 9.2 E | Search box for station records |
+| `tz` | Africa/Lagos | Africa/Lagos | |
+| `data` | `data/abuja` | `data/jos` | Relative to the config file, one per site. Git ignores `data/`. |
+| `borrow` | | `abuja` | Optional: run that site's networks instead of training here |
 
-Each further site is a `gnostiq-<name>.toml` beside `gnostiq.toml`, with its own `paths.data`. A site with a record of its own is a full config like the one above. A site without one sets only `[site]`, `[paths]` and
+The first site is the default for every command. `gnostiq --site jos <command>` (or `GNOSTIQ_SITE=jos`) picks another; `--all-sites` on `run`, `check` and `season` runs each in turn. The file is found by walking up from the working directory, through `GNOSTIQ_CFG`, or with `--config <file>`. `cfg.load()` validates it and reports every problem in one error, so you fix the file once rather than once per mistake.
 
-```toml
-[model]
-from = "gnostiq.toml"
-```
+### Sites without a record
 
-It then runs the networks trained for that config, and takes the window, truth, model inputs, lead days and thresholds from it too, since the networks only hold where those match. `gnostiq-jos.toml` is the example. `cfg.sites(c)` returns the config and every one beside it; the server and `--all-sites` use it.
+A site with `borrow` set has no station record good enough to train on. It runs the networks trained for the named site on its own forecast and height. Because window, truth, model inputs, lead days and thresholds are shared, they always match what those networks were trained on. Commands that need a record of the site's own refuse to run for it; see the Jos notes under the live forecast. A site cannot borrow from one that borrows.
 
 In code:
 
 ```python
 from gnostiq import cfg
 
-c = cfg.get()  # loaded once per process
+c = cfg.get()  # the default site, loaded once per process
 c.site.lat, c.window.test_start, c.paths.raw
+jos = cfg.load(site="jos")
+[x.site.name for x in cfg.sites(c)]  # every site in the file
 ```
 
 ## Downloads
@@ -226,8 +230,8 @@ c.site.lat, c.window.test_start, c.paths.raw
 
 Two sources of observed weather at the site:
 
-- **NOAA GHCNh**: the full record of the synoptic station (`site.wmo`, or the id in `site.ghcnh`), one pipe-separated file.
-- **Iowa Environmental Mesonet**: METAR reports from the airport (`site.icao`), one CSV per year.
+- **NOAA GHCNh**: the full record of the synoptic station (the site's `wmo`, or the id in its `ghcnh`), one pipe-separated file.
+- **Iowa Environmental Mesonet**: METAR reports from the airport (the site's `icao`), one CSV per year.
 
 Run the ingestion with the block for your tool:
 
@@ -346,17 +350,17 @@ It shares the download cache with `gnostiq pull`, prints a one-line verdict and 
 
 | Verdict | Meaning | What to set in `gnostiq.toml` |
 |---|---|---|
-| PASS | Good for temperature and for rain | `site.ghcnh`, `truth.temp`, `truth.rain = "station"` |
-| PARTIAL | Temperature is good, the gauge record is not | `site.ghcnh` if the temperature comes from GHCNh, `truth.temp`, `truth.rain = "chirps"` |
+| PASS | Good for temperature and for rain | `ghcnh`, `truth.temp`, `truth.rain = "station"` |
+| PARTIAL | Temperature is good, the gauge record is not | `ghcnh` if the temperature comes from GHCNh, `truth.temp`, `truth.rain = "chirps"` |
 | FAIL | No source meets the temperature thresholds | Read the hour-of-day table first |
 
-The report ends with the keys to change, grouped under `[site]` and `[truth]`. Every one already exists in `gnostiq.toml`, so edit the existing lines rather than pasting a second `[site]` table, which TOML rejects.
+The report ends with the keys to change, grouped under the site's table (`[sites.abuja]`) and `[truth]`. Every one already exists in `gnostiq.toml`, so edit the existing lines rather than pasting a second table of the same name, which TOML rejects. The gate checks the default site; `GNOSTIQ_SITE=jos python scripts/gate.py` checks another. `[truth]` is shared by every site.
 
-If the station reports from more than 1 km away from `site.lat`/`site.lon`, or more than 10 m from `site.elev_m`, the report also gives the station's own coordinates. Use them: the forecast grid cell, the CHIRPS cell and the lapse-rate correction are all read at the configured site, so a site 25 km from the instrument verifies the wrong place.
+If the station reports from more than 1 km away from the site's `lat`/`lon`, or more than 10 m from its `elev_m`, the report also gives the station's own coordinates. Use them: the forecast grid cell, the CHIRPS cell and the lapse-rate correction are all read at the configured site, so a site 25 km from the instrument verifies the wrong place.
 
 What it measures:
 
-- **Which station this is.** Every distinct latitude, longitude and elevation in the record, with dates. A change part-way through means the station moved. It also works the barometer's height out of the pressure readings, as a check on `site.elev_m`, and compares synoptic temperatures with METAR temperatures at the same hours to see whether they come from one instrument.
+- **Which station this is.** Every distinct latitude, longitude and elevation in the record, with dates. A change part-way through means the station moved. It also works the barometer's height out of the pressure readings, as a check on `elev_m`, and compares synoptic temperatures with METAR temperatures at the same hours to see whether they come from one instrument.
 - **Temperature and dewpoint.** Monthly coverage of the eight synoptic hours, the share of days with a reading at each hour of the day, how many test-season days have both a pre-dawn and an afternoon reading, and the longest gap.
 - **Rain.** How many wet-season days have a usable 24 h total, how many of those are explicit zeros, which hours the accumulation reports arrive at, and annual totals to hold against CHIRPS.
 
@@ -1137,7 +1141,7 @@ hatch run gnostiq pull --only nimet  # not part of a plain pull
 pdm run gnostiq pull --only nimet  # not part of a plain pull
 ```
 
-asks NiMet's node for every report from the station in `site.wmo`, a month at a time and 500 values a page, and keeps the pages under `raw/nimet/`. Past months are never fetched again; the current month is refreshed hourly. Each report arrives as one record per measured value; temperature, dewpoint, station and sea-level pressure and wind speed are kept, reports more than ten minutes off the hour are dropped, and the same gross limits as the other sources apply.
+asks NiMet's node for every report from the site's `wmo` station, a month at a time and 500 values a page, and keeps the pages under `raw/nimet/`. Past months are never fetched again; the current month is refreshed hourly. Each report arrives as one record per measured value; temperature, dewpoint, station and sea-level pressure and wind speed are kept, reports more than ten minutes off the hour are dropped, and the same gross limits as the other sources apply.
 
 Checked against the live node on 2026-11-19, from a cloud browser:
 
@@ -1203,7 +1207,7 @@ pdm run gnostiq season --all-sites
 
 rebuilds what each system would have issued over a whole past season from the forecast archive, lead day by lead day, and scores it against NiMet reports: Gnostiq, EMOS and multi-model EMOS fitted on the training window, the raw models, the height-corrected base model, and the normal range where the site has a station record. It refuses a season that overlaps training. It writes `season.json` and `season.md`; the page shows them under "Season check".
 
-For Abuja, trained to March 2025 and tested on the 2025 wet season, the 2026 season is a second test it never saw. For Jos it is the first test of any kind: the networks and EMOS fitted at Abuja, run on Jos's own forecasts. Run `gnostiq --config gnostiq-jos.toml pull --only nwp,nimet` first.
+For Abuja, trained to March 2025 and tested on the 2025 wet season, the 2026 season is a second test it never saw. For Jos it is the first test of any kind: the networks and EMOS fitted at Abuja, run on Jos's own forecasts. Run `gnostiq --site jos pull --only nwp,nimet` first.
 
 Read it with three things in mind:
 
@@ -1213,71 +1217,71 @@ Read it with three things in mind:
 
 ### A second site: Jos
 
-Jos failed the gate: its synoptic record stops in 2021 and the airport reports only by day. Nothing can be trained or scored there, so `gnostiq-jos.toml` borrows Abuja's networks (see More sites under Configuration). Its forecast is Abuja's networks run on Jos's own ECMWF forecast, after the terrain correction for Jos's height. The model grid sits well below the plateau (1182 m for the cell the old Jos point fell in, against 1290 m at the airport), where at Abuja the gap is 23 m, so the height step does more work here. `pull` measures the height of the cell actually used.
+Jos failed the gate: its synoptic record stops in 2021 and the airport reports only by day. Nothing can be trained or scored there, so its table in `gnostiq.toml` has `borrow = "abuja"` (see Sites without a record under Configuration). Its forecast is Abuja's networks run on Jos's own ECMWF forecast, after the terrain correction for Jos's height. The model grid sits well below the plateau (1182 m for the cell the old Jos point fell in, against 1290 m at the airport), where at Abuja the gap is 23 m, so the height step does more work here. `pull` measures the height of the cell actually used.
 
 #### Standard Python (`venv` / `virtualenv`)
 
 ```bash
-gnostiq --config gnostiq-jos.toml pull    # only the terrain height; nothing else is needed
-gnostiq --config gnostiq-jos.toml run
-gnostiq --config gnostiq-jos.toml check
-gnostiq --config gnostiq-jos.toml season  # after pull --only nwp,nimet
-gnostiq run --all-sites                   # every gnostiq*.toml in the repo root, one after another
+gnostiq --site jos pull    # only the terrain height; nothing else is needed
+gnostiq --site jos run
+gnostiq --site jos check
+gnostiq --site jos season  # after pull --only nwp,nimet
+gnostiq run --all-sites    # every site in gnostiq.toml, one after another
 gnostiq check --all-sites
 ```
 
 #### uv
 
 ```bash
-uv run gnostiq --config gnostiq-jos.toml pull    # only the terrain height; nothing else is needed
-uv run gnostiq --config gnostiq-jos.toml run
-uv run gnostiq --config gnostiq-jos.toml check
-uv run gnostiq --config gnostiq-jos.toml season  # after pull --only nwp,nimet
-uv run gnostiq run --all-sites                   # every gnostiq*.toml in the repo root, one after another
+uv run gnostiq --site jos pull    # only the terrain height; nothing else is needed
+uv run gnostiq --site jos run
+uv run gnostiq --site jos check
+uv run gnostiq --site jos season  # after pull --only nwp,nimet
+uv run gnostiq run --all-sites    # every site in gnostiq.toml, one after another
 uv run gnostiq check --all-sites
 ```
 
 #### Poetry
 
 ```bash
-poetry run gnostiq --config gnostiq-jos.toml pull    # only the terrain height; nothing else is needed
-poetry run gnostiq --config gnostiq-jos.toml run
-poetry run gnostiq --config gnostiq-jos.toml check
-poetry run gnostiq --config gnostiq-jos.toml season  # after pull --only nwp,nimet
-poetry run gnostiq run --all-sites                   # every gnostiq*.toml in the repo root, one after another
+poetry run gnostiq --site jos pull    # only the terrain height; nothing else is needed
+poetry run gnostiq --site jos run
+poetry run gnostiq --site jos check
+poetry run gnostiq --site jos season  # after pull --only nwp,nimet
+poetry run gnostiq run --all-sites    # every site in gnostiq.toml, one after another
 poetry run gnostiq check --all-sites
 ```
 
 #### Pipenv
 
 ```bash
-pipenv run gnostiq --config gnostiq-jos.toml pull    # only the terrain height; nothing else is needed
-pipenv run gnostiq --config gnostiq-jos.toml run
-pipenv run gnostiq --config gnostiq-jos.toml check
-pipenv run gnostiq --config gnostiq-jos.toml season  # after pull --only nwp,nimet
-pipenv run gnostiq run --all-sites                   # every gnostiq*.toml in the repo root, one after another
+pipenv run gnostiq --site jos pull    # only the terrain height; nothing else is needed
+pipenv run gnostiq --site jos run
+pipenv run gnostiq --site jos check
+pipenv run gnostiq --site jos season  # after pull --only nwp,nimet
+pipenv run gnostiq run --all-sites    # every site in gnostiq.toml, one after another
 pipenv run gnostiq check --all-sites
 ```
 
 #### Hatch
 
 ```bash
-hatch run gnostiq --config gnostiq-jos.toml pull    # only the terrain height; nothing else is needed
-hatch run gnostiq --config gnostiq-jos.toml run
-hatch run gnostiq --config gnostiq-jos.toml check
-hatch run gnostiq --config gnostiq-jos.toml season  # after pull --only nwp,nimet
-hatch run gnostiq run --all-sites                   # every gnostiq*.toml in the repo root, one after another
+hatch run gnostiq --site jos pull    # only the terrain height; nothing else is needed
+hatch run gnostiq --site jos run
+hatch run gnostiq --site jos check
+hatch run gnostiq --site jos season  # after pull --only nwp,nimet
+hatch run gnostiq run --all-sites    # every site in gnostiq.toml, one after another
 hatch run gnostiq check --all-sites
 ```
 
 #### PDM
 
 ```bash
-pdm run gnostiq --config gnostiq-jos.toml pull    # only the terrain height; nothing else is needed
-pdm run gnostiq --config gnostiq-jos.toml run
-pdm run gnostiq --config gnostiq-jos.toml check
-pdm run gnostiq --config gnostiq-jos.toml season  # after pull --only nwp,nimet
-pdm run gnostiq run --all-sites                   # every gnostiq*.toml in the repo root, one after another
+pdm run gnostiq --site jos pull    # only the terrain height; nothing else is needed
+pdm run gnostiq --site jos run
+pdm run gnostiq --site jos check
+pdm run gnostiq --site jos season  # after pull --only nwp,nimet
+pdm run gnostiq run --all-sites    # every site in gnostiq.toml, one after another
 pdm run gnostiq check --all-sites
 ```
 
@@ -1342,7 +1346,7 @@ pdm run gnostiq serve --host 0.0.0.0 --port 8080
 | `/api/health` | `{"ok": true, "forecast_init_utc": ..., "sites": {<site>: ...}}` |
 | `/method` | `docs/METHOD.md` as plain text |
 
-`gnostiq serve` serves the config it was started with first, then `gnostiq.toml` and every `gnostiq-*.toml` beside it. Run it from the repo root and both Abuja and Jos are on the page.
+`gnostiq serve` serves every site in `gnostiq.toml`, the one it was started with first, so both Abuja and Jos are on the page.
 
 The API only reads files. A report that has not been generated yet returns 404 with a message naming it, and the page shows which command to run.
 
@@ -1369,79 +1373,79 @@ After setting up with your tool as described under Setup:
 ### Standard Python (`venv` / `virtualenv`)
 
 ```bash
-python scripts/gate.py                                          # then change the keys it lists in gnostiq.toml
-gnostiq pull                                                    # everything; safe to re-run
-gnostiq pull --only tamsat                                      # optional: a second rain truth for the scorecard
-gnostiq all                                                     # build, baselines, train, verify, cases
-gnostiq --config gnostiq-jos.toml pull --only static,nwp,nimet  # Jos: terrain height, forecasts, reports
-gnostiq season --all-sites                                      # the latest wet season against NiMet reports, both sites
-gnostiq run --all-sites                                         # live forecast for Abuja and Jos
-gnostiq serve                                                   # http://127.0.0.1:8000
+python scripts/gate.py                           # then change the keys it lists in gnostiq.toml
+gnostiq pull                                     # everything; safe to re-run
+gnostiq pull --only tamsat                       # optional: a second rain truth for the scorecard
+gnostiq all                                      # build, baselines, train, verify, cases
+gnostiq --site jos pull --only static,nwp,nimet  # Jos: terrain height, forecasts, reports
+gnostiq season --all-sites                       # the latest wet season against NiMet reports, both sites
+gnostiq run --all-sites                          # live forecast for Abuja and Jos
+gnostiq serve                                    # http://127.0.0.1:8000
 ```
 
 ### uv
 
 ```bash
-uv run python scripts/gate.py                                          # then change the keys it lists in gnostiq.toml
-uv run gnostiq pull                                                    # everything; safe to re-run
-uv run gnostiq pull --only tamsat                                      # optional: a second rain truth for the scorecard
-uv run gnostiq all                                                     # build, baselines, train, verify, cases
-uv run gnostiq --config gnostiq-jos.toml pull --only static,nwp,nimet  # Jos: terrain height, forecasts, reports
-uv run gnostiq season --all-sites                                      # the latest wet season against NiMet reports, both sites
-uv run gnostiq run --all-sites                                         # live forecast for Abuja and Jos
-uv run gnostiq serve                                                   # http://127.0.0.1:8000
+uv run python scripts/gate.py                           # then change the keys it lists in gnostiq.toml
+uv run gnostiq pull                                     # everything; safe to re-run
+uv run gnostiq pull --only tamsat                       # optional: a second rain truth for the scorecard
+uv run gnostiq all                                      # build, baselines, train, verify, cases
+uv run gnostiq --site jos pull --only static,nwp,nimet  # Jos: terrain height, forecasts, reports
+uv run gnostiq season --all-sites                       # the latest wet season against NiMet reports, both sites
+uv run gnostiq run --all-sites                          # live forecast for Abuja and Jos
+uv run gnostiq serve                                    # http://127.0.0.1:8000
 ```
 
 ### Poetry
 
 ```bash
-poetry run python scripts/gate.py                                          # then change the keys it lists in gnostiq.toml
-poetry run gnostiq pull                                                    # everything; safe to re-run
-poetry run gnostiq pull --only tamsat                                      # optional: a second rain truth for the scorecard
-poetry run gnostiq all                                                     # build, baselines, train, verify, cases
-poetry run gnostiq --config gnostiq-jos.toml pull --only static,nwp,nimet  # Jos: terrain height, forecasts, reports
-poetry run gnostiq season --all-sites                                      # the latest wet season against NiMet reports, both sites
-poetry run gnostiq run --all-sites                                         # live forecast for Abuja and Jos
-poetry run gnostiq serve                                                   # http://127.0.0.1:8000
+poetry run python scripts/gate.py                           # then change the keys it lists in gnostiq.toml
+poetry run gnostiq pull                                     # everything; safe to re-run
+poetry run gnostiq pull --only tamsat                       # optional: a second rain truth for the scorecard
+poetry run gnostiq all                                      # build, baselines, train, verify, cases
+poetry run gnostiq --site jos pull --only static,nwp,nimet  # Jos: terrain height, forecasts, reports
+poetry run gnostiq season --all-sites                       # the latest wet season against NiMet reports, both sites
+poetry run gnostiq run --all-sites                          # live forecast for Abuja and Jos
+poetry run gnostiq serve                                    # http://127.0.0.1:8000
 ```
 
 ### Pipenv
 
 ```bash
-pipenv run python scripts/gate.py                                          # then change the keys it lists in gnostiq.toml
-pipenv run gnostiq pull                                                    # everything; safe to re-run
-pipenv run gnostiq pull --only tamsat                                      # optional: a second rain truth for the scorecard
-pipenv run gnostiq all                                                     # build, baselines, train, verify, cases
-pipenv run gnostiq --config gnostiq-jos.toml pull --only static,nwp,nimet  # Jos: terrain height, forecasts, reports
-pipenv run gnostiq season --all-sites                                      # the latest wet season against NiMet reports, both sites
-pipenv run gnostiq run --all-sites                                         # live forecast for Abuja and Jos
-pipenv run gnostiq serve                                                   # http://127.0.0.1:8000
+pipenv run python scripts/gate.py                           # then change the keys it lists in gnostiq.toml
+pipenv run gnostiq pull                                     # everything; safe to re-run
+pipenv run gnostiq pull --only tamsat                       # optional: a second rain truth for the scorecard
+pipenv run gnostiq all                                      # build, baselines, train, verify, cases
+pipenv run gnostiq --site jos pull --only static,nwp,nimet  # Jos: terrain height, forecasts, reports
+pipenv run gnostiq season --all-sites                       # the latest wet season against NiMet reports, both sites
+pipenv run gnostiq run --all-sites                          # live forecast for Abuja and Jos
+pipenv run gnostiq serve                                    # http://127.0.0.1:8000
 ```
 
 ### Hatch
 
 ```bash
-hatch run python scripts/gate.py                                          # then change the keys it lists in gnostiq.toml
-hatch run gnostiq pull                                                    # everything; safe to re-run
-hatch run gnostiq pull --only tamsat                                      # optional: a second rain truth for the scorecard
-hatch run gnostiq all                                                     # build, baselines, train, verify, cases
-hatch run gnostiq --config gnostiq-jos.toml pull --only static,nwp,nimet  # Jos: terrain height, forecasts, reports
-hatch run gnostiq season --all-sites                                      # the latest wet season against NiMet reports, both sites
-hatch run gnostiq run --all-sites                                         # live forecast for Abuja and Jos
-hatch run gnostiq serve                                                   # http://127.0.0.1:8000
+hatch run python scripts/gate.py                           # then change the keys it lists in gnostiq.toml
+hatch run gnostiq pull                                     # everything; safe to re-run
+hatch run gnostiq pull --only tamsat                       # optional: a second rain truth for the scorecard
+hatch run gnostiq all                                      # build, baselines, train, verify, cases
+hatch run gnostiq --site jos pull --only static,nwp,nimet  # Jos: terrain height, forecasts, reports
+hatch run gnostiq season --all-sites                       # the latest wet season against NiMet reports, both sites
+hatch run gnostiq run --all-sites                          # live forecast for Abuja and Jos
+hatch run gnostiq serve                                    # http://127.0.0.1:8000
 ```
 
 ### PDM
 
 ```bash
-pdm run python scripts/gate.py                                          # then change the keys it lists in gnostiq.toml
-pdm run gnostiq pull                                                    # everything; safe to re-run
-pdm run gnostiq pull --only tamsat                                      # optional: a second rain truth for the scorecard
-pdm run gnostiq all                                                     # build, baselines, train, verify, cases
-pdm run gnostiq --config gnostiq-jos.toml pull --only static,nwp,nimet  # Jos: terrain height, forecasts, reports
-pdm run gnostiq season --all-sites                                      # the latest wet season against NiMet reports, both sites
-pdm run gnostiq run --all-sites                                         # live forecast for Abuja and Jos
-pdm run gnostiq serve                                                   # http://127.0.0.1:8000
+pdm run python scripts/gate.py                           # then change the keys it lists in gnostiq.toml
+pdm run gnostiq pull                                     # everything; safe to re-run
+pdm run gnostiq pull --only tamsat                       # optional: a second rain truth for the scorecard
+pdm run gnostiq all                                      # build, baselines, train, verify, cases
+pdm run gnostiq --site jos pull --only static,nwp,nimet  # Jos: terrain height, forecasts, reports
+pdm run gnostiq season --all-sites                       # the latest wet season against NiMet reports, both sites
+pdm run gnostiq run --all-sites                          # live forecast for Abuja and Jos
+pdm run gnostiq serve                                    # http://127.0.0.1:8000
 ```
 
 Read `data/abuja/reports/gate.md` first, then `qc.md`, then `scorecard.md` in the same directory, then `season.md` for both sites.
@@ -1531,7 +1535,7 @@ The pipeline has run end to end on real data for Abuja, with the 2025 wet season
 1. **GHCNh file layout.** See "Not yet checked against a real file" under Station observations. This is the most likely thing to need a fix on the first run, and the gate exercises it first.
 2. **CHIRPS day boundary.** Daily totals are treated as 00 to 00 UTC. If the product's day is offset, forecast and truth are misaligned by some hours.
 3. **Station identity.** If the gate says the synoptic and METAR temperatures come from a "different site or sensor", `truth.temp = "merged"` mixes two instruments. Use `ghcnh` or `iem` alone.
-4. **Station height.** The terrain correction is station height minus the model's 1182 m. At the listed 1295 m the model is cooled by about 0.7 degC. If the gate's barometer estimate disagrees with 1295 m, fix `site.elev_m` before training.
+4. **Station height.** The terrain correction is station height minus the model's 1182 m. At the listed 1295 m the model is cooled by about 0.7 degC. If the gate's barometer estimate disagrees with 1295 m, fix the site's `elev_m` before training.
 5. **Open-Meteo licence.** The free API is non-commercial. A commercial service needs their paid plan or your own ingest of ECMWF open data.
 
 ## Known gaps
@@ -1548,7 +1552,7 @@ The pipeline has run end to end on real data for Abuja, with the 2025 wet season
 | Warning `variable group 'levels' not served` | Expected. A `levels.missing` marker stops further attempts; `--refresh` tries again. |
 | 429 or repeated retries | Rate limit. Wait, then re-run; finished downloads are skipped. |
 | `removed N unreadable forecast chunk(s)` from `gnostiq all` | A download came back empty or cut off. Run `gnostiq pull --only nwp`, which fetches just those chunks, then `gnostiq all`. |
-| `N GHCNh candidates ...` | Several station records match. Run the gate and set `site.ghcnh`. |
+| `N GHCNh candidates ...` | Several station records match. Run the gate and set the site's `ghcnh`. |
 | CHIRPS log says many days not read | Usually the rate limit; re-run. If every read fails, open one URL from `precip.url()` in a browser. |
 | `pairs have no train or no test rows` | The windows do not overlap the data. Check the last observation date in `data/reports/gate.md`. |
 | `only N wet training days` | Rain truth is too sparse. Use `truth.rain = "chirps"`. |

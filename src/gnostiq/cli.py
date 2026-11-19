@@ -126,6 +126,7 @@ def serve(c, a):
 def main(argv=None):
     p = argparse.ArgumentParser(prog="gnostiq")
     p.add_argument("--config", help=f"config file (default: {cfg.FILENAME} found upward, or $GNOSTIQ_CFG)")
+    p.add_argument("--site", help="site table in the config (default: the first, or $GNOSTIQ_SITE)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     def add(name, fn, text):
@@ -144,21 +145,21 @@ def main(argv=None):
     add("cases", cases, "write the heavy-rain case replays")
     add("all", everything, "build, baselines, train, verify, cases")
     s = add("run", run, "fetch the latest forecast and write forecast.json")
-    s.add_argument("--all-sites", action="store_true", help="every gnostiq*.toml beside the config")
+    s.add_argument("--all-sites", action="store_true", help="every site in the config")
     k = add("check", check, "score past forecasts against reports that came in since")
     k.add_argument("--days", type=int, default=30)
-    k.add_argument("--all-sites", action="store_true", help="every gnostiq*.toml beside the config")
+    k.add_argument("--all-sites", action="store_true", help="every site in the config")
     s = add("season", season, "score a past season against NiMet reports (default: the latest wet season)")
     s.add_argument("--start", help="first day, YYYY-MM-DD")
     s.add_argument("--end", help="last day, YYYY-MM-DD")
-    s.add_argument("--all-sites", action="store_true", help="every gnostiq*.toml beside the config")
+    s.add_argument("--all-sites", action="store_true", help="every site in the config")
     s = add("serve", serve, "serve the API and web page")
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--port", type=int, default=8000)
 
     a = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
-    c = cfg.load(a.config) if a.config else cfg.get()
+    c = cfg.load(a.config, a.site) if a.config or a.site else cfg.get()
     if c.donor and a.cmd in OWN:
         raise SystemExit(
             f"{c.site.name} runs the networks trained for {c.donor} and has no record of its own to {a.cmd}"

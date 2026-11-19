@@ -1,7 +1,7 @@
 import json
 
 import pytest
-from conftest import write_cfg, write_nearby
+from conftest import add_nearby, write_cfg
 from fastapi.testclient import TestClient
 
 from gnostiq import api, cfg
@@ -69,15 +69,14 @@ def test_no_interactive_docs_are_exposed(site):
 
 def test_every_site_beside_the_config_is_served(tmp_path):
     c = cfg.load(write_cfg(tmp_path))
-    near = cfg.load(write_nearby(tmp_path))
+    near = add_nearby(tmp_path)
     for x in (c, near):
         x.paths.ensure()
         (x.paths.reports / "forecast.json").write_text(json.dumps({"init_utc": x.site.name, "hourly": []}))
     client = TestClient(api.create(c))
     sites = client.get("/api/sites").json()
     assert all(s["compare"] == list(c.nwp.compare) for s in sites)
-    assert [(s["name"], s["trained_at"], s["config"]) for s in sites] == [
-        ("jos", "jos", "gnostiq.toml"), ("nearby", "jos", "gnostiq-nearby.toml")]  # fmt: skip
+    assert [(s["name"], s["trained_at"]) for s in sites] == [("jos", "jos"), ("nearby", "jos")]
     assert client.get("/api/nearby/forecast").json()["init_utc"] == "nearby"
     assert client.get("/api/forecast").json()["init_utc"] == "jos"
     assert client.get("/api/health").json()["sites"] == {"jos": "jos", "nearby": "nearby"}
