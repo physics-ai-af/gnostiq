@@ -28,7 +28,7 @@ def test_good_temperature_record_without_gauge_is_partial(station_raw):
     for part in ("## GHCNh records near the site", "## GHCNh NIM00065134", "Location history",
                  "Monthly synoptic-slot coverage", "barometer elevation", "vs DNJO METAR", "## Gate"):  # fmt: skip
         assert part in text, part
-    assert '[site]\nghcnh = "NIM00065134"\n\n[truth]\ntemp = "ghcnh"\nrain = "chirps"\n```' in text
+    assert '[sites.jos]\nghcnh = "NIM00065134"\n\n[truth]\ntemp = "ghcnh"\nrain = "chirps"\n```' in text
     assert "from the configured site" not in text
 
 
@@ -41,7 +41,7 @@ def test_suggests_moving_the_site_onto_the_station(tmp_path):
     assert r.returncode == 0, r.stderr
     text = report.read_text()
     assert "NIM00065134 puts the station at 9.8667, 8.9000, 1295 m, 22 km from the configured site." in text
-    assert '[site]\nghcnh = "NIM00065134"\nlat = 9.8667\nlon = 8.9\nelev_m = 1295\n' in text
+    assert '[sites.jos]\nghcnh = "NIM00065134"\nlat = 9.8667\nlon = 8.9\nelev_m = 1295\n' in text
 
 
 def test_station_id_can_be_pinned(station_raw):
@@ -65,7 +65,7 @@ def test_a_rough_synop_position_does_not_move_the_site(tmp_path):
     assert r.returncode == 0, r.stderr
     text = report.read_text()
     assert "- reading: same instrument" in text and "puts the station at" not in text
-    assert '[site]\nghcnh = "NIM00065134"\n\n[truth]' in text
+    assert '[sites.jos]\nghcnh = "NIM00065134"\n\n[truth]' in text
 
 
 @pytest.fixture(scope="module")

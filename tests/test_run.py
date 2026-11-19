@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import synth
-from conftest import LIVE, write_nearby
+from conftest import LIVE, add_nearby, drop_nearby
 
 from gnostiq import cfg, cli, model, run
 from gnostiq.ingest import nwp, static
@@ -105,12 +105,12 @@ def test_extra_models_feed_the_forecast_and_a_missing_one_is_survivable(trained)
 @pytest.fixture
 def nearby(trained):
     # a second site beside the trained one, with its own terrain height and no record
-    c = cfg.load(write_nearby(trained.source.parent))
+    c = add_nearby(trained.source.parent)
     c.paths.ensure()
     shutil.copy(trained.paths.processed / "static.json", c.paths.processed / "static.json")
     yield c
     shutil.rmtree(c.paths.data)
-    (trained.source.parent / "gnostiq-nearby.toml").unlink()
+    drop_nearby(trained.source.parent)
 
 
 def test_a_borrowing_site_runs_the_donor_networks_at_its_own_height(trained, nearby):
@@ -149,10 +149,10 @@ def test_run_all_sites_keeps_going_past_a_failure(trained, nearby, monkeypatch):
 def test_pull_on_a_borrowing_site_fetches_only_its_terrain(nearby, monkeypatch):
     seen = []
     monkeypatch.setattr(static, "pull", lambda c, refresh=False: seen.append(c.site.name))
-    cli.main(["--config", str(nearby.source), "pull"])
+    cli.main(["--config", str(nearby.source), "--site", "nearby", "pull"])
     assert seen == ["nearby"]
 
 
 def test_the_repo_jos_config_borrows_abuja():
-    j = cfg.load(LIVE.parent / "gnostiq-jos.toml")
+    j = cfg.load(LIVE, "jos")
     assert j.donor == "abuja" and j.paths.data != cfg.load(LIVE).paths.data

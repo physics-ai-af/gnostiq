@@ -464,7 +464,7 @@ async function start() {
   SITE = sites.find((s) => s.name === want) || sites[0];
   renderSites(sites);
   setSite(SITE);
-  const api = (kind) => `/api/${SITE.name}/${kind}`, cfg = SITE === sites[0] ? "" : ` --config ${SITE.config}`;
+  const api = (kind) => `/api/${SITE.name}/${kind}`, cfg = SITE === sites[0] ? "" : ` --site ${SITE.name}`;
   load(api("forecast"), "#forecast", renderForecast, `gnostiq${cfg} run`);
   load(api("live"), "#live", renderLive, `gnostiq${cfg} check`);
   load(api("season"), "#season", renderSeason, `gnostiq${cfg} season`);

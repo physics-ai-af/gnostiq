@@ -1,5 +1,5 @@
 import pytest
-from conftest import write_cfg, write_nearby
+from conftest import add_nearby, write_cfg
 
 from gnostiq import cfg, cli
 from gnostiq.ingest import station
@@ -43,14 +43,16 @@ def test_build_without_data_says_what_to_run(repo):
         cli.main(["build"])
 
 
-def test_config_option_picks_the_file(repo, monkeypatch):
+def test_site_option_picks_the_table(repo, monkeypatch):
     seen = []
     monkeypatch.setattr(station, "pull", lambda c, refresh=False: seen.append(c.site.name))
-    cli.main(["--config", str(write_nearby(repo)), "pull", "--only", "station"])
+    add_nearby(repo)
+    cli.main(["--site", "nearby", "pull", "--only", "station"])
     cli.main(["pull", "--only", "station"])
     assert seen == ["nearby", "jos"]
 
 
 def test_a_site_on_borrowed_networks_cannot_build_or_train(repo):
     with pytest.raises(SystemExit, match="networks trained for jos"):
-        cli.main(["--config", str(write_nearby(repo)), "build"])
+        add_nearby(repo)
+        cli.main(["--site", "nearby", "build"])

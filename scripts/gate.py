@@ -148,7 +148,7 @@ def settings(site, truth):
         return f'"{v}"' if isinstance(v, str) else f"{v:g}"
 
     out = ["", "Change these keys in gnostiq.toml. Each already exists in its section:", "", "```toml"]
-    for name, kv in (("site", site), ("truth", truth)):
+    for name, kv in ((f"sites.{C.site.name}", site), ("truth", truth)):
         if kv:
             out += [f"[{name}]", *(f"{k} = {val(v)}" for k, v in kv.items()), ""]
     return out[:-1] + ["```"]

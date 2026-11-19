@@ -1,15 +1,5 @@
-# station fields are provisional until scripts/gate.py has run
-
-[site]
-name = "abuja"
-wmo = "65125"
-icao = "DNAA"
-ghcnh = "NIM00065125"         # Abuja synop, from the gate
-lat = 9.0068
-lon = 7.2632
-elev_m = 342.0
-tz = "Africa/Lagos"
-bbox = [8.8, 9.2, 7.0, 7.5]   # lat0, lat1, lon0, lon1
+# Settings shared by every site, then one table per site. The first site is the default for every command;
+# --site picks another, --all-sites runs them all.
 
 [window]
 start = 2021-01-01            # station history for climatology and QC
@@ -43,5 +33,26 @@ max_epochs = 300
 patience = 25
 eff_max = 2.0                 # cap on rain / precipitable water
 
-[paths]
-data = "data/abuja"           # caches are not split by site
+[sites.abuja]
+wmo = "65125"
+icao = "DNAA"
+ghcnh = "NIM00065125"         # Abuja synop, from the gate
+lat = 9.0068
+lon = 7.2632
+elev_m = 342.0
+tz = "Africa/Lagos"
+bbox = [8.8, 9.2, 7.0, 7.5]   # lat0, lat1, lon0, lon1
+data = "data/abuja"
+
+# no public record that passes the gate, so nothing is trained here
+[sites.jos]
+wmo = "65134"
+icao = "DNJO"
+ghcnh = "NII0000DNJO"
+lat = 9.6398                  # Yakubu Gowon airport, from the GHCNh record
+lon = 8.8691
+elev_m = 1289.9
+tz = "Africa/Lagos"
+bbox = [9.4, 10.1, 8.6, 9.2]
+data = "data/jos"
+borrow = "abuja"              # runs abuja's networks on its own forecast and height

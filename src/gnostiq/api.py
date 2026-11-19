@@ -38,7 +38,7 @@ def create(c=None):
 
     @app.get("/api/sites")
     def listing():
-        return [{"name": n, "trained_at": x.donor or n, "config": x.source.name, "lat": x.site.lat, "lon": x.site.lon,
+        return [{"name": n, "trained_at": x.donor or n, "lat": x.site.lat, "lon": x.site.lon,
                  "elev_m": x.site.elev, "compare": list(x.nwp.compare)} for n, x in sites.items()]  # fmt: skip
 
     @app.get("/api/{site}/{kind}")
