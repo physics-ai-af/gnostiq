@@ -7,6 +7,8 @@ import numpy as np
 import pandas as pd
 
 from gnostiq import dist
+from gnostiq.cfg import VARS
+from gnostiq.ingest import tamsat
 
 log = logging.getLogger("gnostiq")
 
@@ -126,6 +128,20 @@ def reliability(p, o):
 def daily(c, rng):
     pred = load(c, "daily")
     pred, have = common(pred, ["day", "lead_day"], CORE_D)
+    card = score_daily(pred, have, c, rng)
+    alt = tamsat.cache(c)
+    # a second satellite truth on the same day boundary: skill that only one truth shows is not skill
+    if alt.exists() and c.truth.rain == "chirps":
+        t = pd.read_parquet(alt)[["day", "tp24"]].rename(columns={"tp24": "obs"})
+        t = t[t.obs.between(VARS["tp24"].lo, VARS["tp24"].hi)]
+        p2 = pred.drop(columns="obs").merge(t, on="day")
+        if len(p2):
+            card["alt"] = {"truth": "tamsat", **score_daily(p2, have, c, rng)}
+    return card
+
+
+def score_daily(pred, have, c, rng):
+    pred = pred.copy()
     pred["crps"] = dist.crps_quantiles(pred.obs.to_numpy(), pred[dist.QCOLS].to_numpy(float))
     o1, o10 = pred.obs >= c.wet_mm, pred.obs >= c.heavy_mm
     pred["b1"], pred["b10"] = (pred.p1 - o1) ** 2, (pred.p10 - o10) ** 2
@@ -207,6 +223,17 @@ def markdown(card):
     for name, refs in d["skill"].items():
         for ref, sk in refs.items():
             out += ["", f"{name} vs {ref}: {skill_cell(sk['overall'])}"]
+    if "alt" in d:
+        a = d["alt"]
+        rate = fmt(a["base_rate"]["wet"])
+        out += ["", f"### tp24 against {a['truth']} ({a['n_cases']} cases; wet-day rate {rate})", "",
+                "| system | n | Brier wet | Brier heavy | CRPS |", "|---|---|---|---|---|"]  # fmt: skip
+        for s, x in a["systems"].items():
+            o = x["overall"]
+            out.append(f"| {s} | {o['n']} | {fmt(o['brier1'], 3)} | {fmt(o['brier10'], 3)} | {fmt(o['crps'])} |")
+        for name, refs in a["skill"].items():
+            for ref, sk in refs.items():
+                out += ["", f"{name} vs {ref}: {skill_cell(sk['overall'])}"]
     return "\n".join(out) + "\n"
 
 

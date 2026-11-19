@@ -77,7 +77,7 @@ def emos(c, fit, target, prior, ocol, extra=(), name="emos"):
 def hourly(c):
     p = pd.read_parquet(c.paths.processed / "pairs_hourly.parquet")
     obs = pd.read_parquet(c.paths.interim / "obs.parquet").rename(columns={"t": "o_t2m", "td": "o_td2m"})
-    extras = align.extras(c)
+    others = align.extras(c, c.nwp.others)
 
     out = []
     for var, (ocol, fcol, prior) in HVARS.items():
@@ -93,7 +93,7 @@ def hourly(c):
         emit("persist", prev)
         emit("raw", q[fcol])
         emit("lapse", q[prior])
-        for m, e in extras.items():
+        for m, e in others.items():
             emit(f"raw:{m}", q[["valid", "lead_day"]].merge(e, on=["valid", "lead_day"], how="left")[fcol])
 
         fit = q[q.split == "train"]
@@ -187,7 +187,7 @@ def daily(c):
     out.append(point_rain(key, prev, c).assign(system="persist"))
     out.append(point_rain(key, p.f_tp24, c).assign(system="raw"))
 
-    for m in c.nwp.extra:
+    for m in c.nwp.others:
         path = c.paths.interim / f"nwp_{m}.parquet"
         if not path.exists():
             continue

@@ -1,4 +1,5 @@
 import json
+import shutil
 
 import pandas as pd
 import pytest
@@ -7,7 +8,7 @@ from conftest import SMALL, SYNTH_END, write_cfg, write_nearby
 from fastapi.testclient import TestClient
 
 from gnostiq import api, cfg, cli, verify
-from gnostiq.ingest import nwp
+from gnostiq.ingest import nimet, nwp
 
 
 @pytest.fixture(scope="module")
@@ -98,3 +99,13 @@ def test_a_second_site_runs_on_the_first_sites_networks(repo):
     assert doc["trained_at"] == c.site.name and doc["site"]["name"] == "nearby" and doc["hourly"]
     assert client.get("/api/nearby/verify").status_code == 404
     assert list(near.paths.archive.glob("*.parquet")) and not (near.paths.data / "models").exists()
+
+    # the season check for both, against stand-in synops
+    shutil.copytree(c.paths.raw / "nwp", near.paths.raw / "nwp")
+    tru, _ = synth.truth(c, SYNTH_END)
+    synops = tru.set_index("valid")[["t", "td"]]
+    mp.setattr(nimet, "obs", lambda c, a, b: (synops[(synops.index >= a) & (synops.index <= b)], {}))
+    cli.main(["season", "--start", str(c.window.test_start), "--end", str(c.window.test_end), "--all-sites"])
+    for name in (c.site.name, "nearby"):
+        doc = client.get(f"/api/{name}/season").json()
+        assert doc["vars"]["t2m"]["cases"] > 0 and doc["trained_at"] == c.site.name

@@ -88,7 +88,8 @@ def test_rain_climatology_uses_days_near_the_calendar_date(raw):
 def test_hourly_baselines_cover_every_system(based):
     c = based
     pred = pd.read_parquet(c.paths.processed / "pred_hourly_base.parquet")
-    assert set(pred.system) == {"clim", "persist", "raw", "lapse", "emos", "emos_multi", f"raw:{c.nwp.extra[0]}"}
+    raws = {f"raw:{m}" for m in (*c.nwp.extra, *c.nwp.compare)}
+    assert set(pred.system) == {"clim", "persist", "raw", "lapse", "emos", "emos_multi", *raws}
     assert set(pred["var"]) == {"t2m", "td2m"} and pred.mu.notna().all()
     assert set(pred.system[pred.sigma.notna()]) == {"clim", "emos", "emos_multi"} and (pred.sigma.dropna() > 0).all()
 
@@ -112,7 +113,7 @@ def test_terrain_correction_beats_the_raw_model_on_the_warm_biased_synthetic_run
 def test_daily_baselines_are_coherent(based):
     c = based
     pred = pd.read_parquet(c.paths.processed / "pred_daily_base.parquet")
-    assert set(pred.system) == {"clim", "persist", "raw", "emos", f"raw:{c.nwp.extra[0]}"}
+    assert set(pred.system) == {"clim", "persist", "raw", "emos", *(f"raw:{m}" for m in (*c.nwp.extra, *c.nwp.compare))}
     q = pred[dist.QCOLS].to_numpy()
     assert (np.diff(q, axis=1) >= -1e-6).all() and (q >= 0).all()
     assert ((pred.p10 <= pred.p1 + 1e-9) & pred.p1.between(0, 1)).all()

@@ -71,6 +71,11 @@ class Nwp:
     extra: tuple[str, ...]
     start: date
     chunk_days: int
+    compare: tuple[str, ...] = ()  # scored and drawn, never fed to the networks
+
+    @property
+    def others(self):
+        return (*self.extra, *self.compare)
 
 
 @dataclass(frozen=True)
@@ -85,7 +90,7 @@ class Model:
 @dataclass(frozen=True)
 class Paths:
     data: Path
-    borrowed: Path | None = None
+    home: Path | None = None  # data directory of the site whose networks these are
 
     @property
     def raw(self):
@@ -101,7 +106,12 @@ class Paths:
 
     @property
     def models(self):
-        return self.borrowed or self.data / "models"
+        return (self.home or self.data) / "models"
+
+    @property
+    def trained(self):
+        # the training pairs behind those networks
+        return (self.home or self.data) / "processed"
 
     @property
     def reports(self):
@@ -150,7 +160,7 @@ def read(path):
 def load(path=None):
     path = Path(path or find()).resolve()
     raw = read(path)
-    donor, borrowed = "", None
+    donor, home = "", None
     src = raw.get("model", {}).get("from")
     if src:
         # the networks only hold where window, truth, inputs and leads match their training, so all of it comes from src
@@ -166,7 +176,7 @@ def load(path=None):
         if d.site.name == raw.get("site", {}).get("name"):
             raise ValueError(f"{path}: has the same site name as {src}")
         raw = {**base, "site": raw.get("site", {}), "paths": raw.get("paths", {})}
-        donor, borrowed = d.site.name, d.paths.models
+        donor, home = d.site.name, d.paths.data
 
     def need(section, key):
         try:
@@ -202,6 +212,7 @@ def load(path=None):
         extra=tuple(need("nwp", "extra")),
         start=need("nwp", "start"),
         chunk_days=int(need("nwp", "chunk_days")),
+        compare=tuple(raw["nwp"].get("compare", [])),
     )
     model = Model(
         seeds=int(need("model", "seeds")),
@@ -219,7 +230,7 @@ def load(path=None):
         wet_mm=float(need("forecast", "wet_mm")),
         heavy_mm=float(need("forecast", "heavy_mm")),
         model=model,
-        paths=Paths((path.parent / need("paths", "data")).resolve(), borrowed),
+        paths=Paths((path.parent / need("paths", "data")).resolve(), home),
         source=path,
         donor=donor,
     )
@@ -270,6 +281,8 @@ def check(c):
 
     if not c.nwp.base or c.nwp.base in c.nwp.extra:
         errs.append("nwp.base must be set and must not appear in nwp.extra")
+    if set(c.nwp.compare) & {c.nwp.base, *c.nwp.extra} or len(set(c.nwp.compare)) != len(c.nwp.compare):
+        errs.append("nwp.compare must not repeat itself, nwp.base or nwp.extra")
     if not 7 <= c.nwp.chunk_days <= 366:
         errs.append(f"nwp.chunk_days must be within 7..366: {c.nwp.chunk_days}")
 

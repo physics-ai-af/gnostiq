@@ -41,6 +41,18 @@ GROUPS = {
     },
 }
 CORE = ["f_t2m", "f_td2m", "f_tp", "f_msl"]
+POINT = {k: GROUPS["core"][k] for k in ("f_t2m", "f_td2m", "f_tp")}
+
+
+def models(c):
+    return (c.nwp.base, *c.nwp.others)
+
+
+def groups(c, model):
+    # the networks read every base field and the core of each extra; compared models are only scored
+    if model == c.nwp.base:
+        return GROUPS
+    return {"core": GROUPS["core"]} if model in c.nwp.extra else {"point": POINT}
 
 
 def base_params(c, model):
@@ -79,9 +91,8 @@ def pull(c, refresh=False):
         log.warning("refetching unreadable %s/%s", p.parent.name, p.name)
         p.unlink()
     today = pd.Timestamp.now("UTC").tz_localize(None).floor("D")
-    for model in (c.nwp.base, *c.nwp.extra):
-        groups = GROUPS if model == c.nwp.base else {"core": GROUPS["core"]}
-        for gname, gvars in groups.items():
+    for model in models(c):
+        for gname, gvars in groups(c, model).items():
             hourly = ",".join(f"{v}_previous_day{d}" for v in gvars.values() for d in c.lead_days)
             skip = c.paths.raw / "nwp" / model / f"{gname}.missing"
             if skip.exists() and not refresh:
@@ -133,10 +144,10 @@ def build(c):
         names = ", ".join(f"{p.parent.name}/{p.name}" for p in bad)
         raise RuntimeError(f"removed {len(bad)} unreadable forecast chunk(s): {names}; run `gnostiq pull --only nwp`")
     out = {}
-    for model in (c.nwp.base, *c.nwp.extra):
+    for model in models(c):
         d = c.paths.raw / "nwp" / model
         per_group = []
-        for gname, gvars in GROUPS.items():
+        for gname, gvars in groups(c, model).items():
             parts = [
                 parse_prev(json.loads(p.read_text()), gvars, c.lead_days) for p in sorted(d.glob(f"{gname}_*.json"))
             ]
@@ -145,7 +156,7 @@ def build(c):
                 per_group.append(g.set_index(["valid", "lead_day"]))
         if not per_group:
             if model == c.nwp.base:
-                raise FileNotFoundError(f"no NWP chunks in {d}; run `gnostiq pull`")
+                raise FileNotFoundError(f"no NWP chunks in {d}; run `gnostiq pull --only nwp`")
             log.warning("nwp %s: nothing cached, skipped", model)
             continue
         df = pd.concat(per_group, axis=1).reset_index().sort_values(["lead_day", "valid"])
@@ -177,7 +188,7 @@ def live(c, days=9):
 
 def live_extra(c, days=9):
     out = {}
-    for m in c.nwp.extra:
+    for m in c.nwp.others:
         params = {**base_params(c, m), "forecast_days": days, "past_days": 2, "hourly": "temperature_2m,dew_point_2m"}
         try:
             h = _get(LIVE, params)["hourly"]
