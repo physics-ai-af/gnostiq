@@ -7,7 +7,7 @@ import pytest
 import requests
 import synth
 
-from gnostiq import live, run
+from gnostiq import dist, live, run
 from gnostiq.ingest import station
 
 
@@ -57,6 +57,35 @@ def test_check_scores_what_was_shown_against_the_reports(issued, monkeypatch):
     assert t["daily"] and all({"day", "gnostiq", "raw"} <= set(d) for d in t["daily"])
     assert json.loads((c.paths.reports / "live.json").read_text()) == out
     assert (c.paths.reports / "live.md").read_text().startswith(f"# Live check: {c.site.name}")
+
+
+def test_the_last_week_puts_forecast_and_report_side_by_side(trained, monkeypatch):
+    c = trained
+    shutil.rmtree(c.paths.archive, ignore_errors=True)
+    today = pd.Timestamp.now("UTC").tz_localize(None).floor("D")
+    inits = [today - pd.Timedelta(days=d, hours=-2) for d in (3, 2)]
+    old, new = (issue(c, i) for i in inits)
+    # an archive written before the band was saved
+    path = c.paths.archive / f"{inits[0]:%Y%m%dT%H}.parquet"
+    pd.read_parquet(path).drop(columns=["q10", "q90"]).to_parquet(path, index=False)
+    g = new[(new.system == "gnostiq") & (new["var"] == "t2m") & (new.lead_day == 1)]
+    # reports on the newer issue's day-ahead hours only, a little warm; the last four fall on the next local day
+    rep = g.assign(obs=g.mu + 0.3)[["valid", "var", "obs"]]
+    monkeypatch.setattr(live, "reports", lambda c, since, until: rep)
+    r = live.run(c)["recent"]
+
+    assert len(r["hourly"]) == 48 and r["tz"] == c.site.tz
+    by = {pd.Timestamp(h["valid_utc"].rstrip("Z")): h["t2m"] for h in r["hourly"]}
+    for _, x in g.iterrows():
+        assert by[x.valid]["obs"] == round(x.mu + 0.3, 1) and (by[x.valid]["q10"], by[x.valid]["q90"]) == (x.q10, x.q90)
+    o = old[(old.system == "gnostiq") & (old["var"] == "t2m") & (old.lead_day == 1)].iloc[0]
+    assert by[o.valid]["obs"] is None and by[o.valid]["q10"] == pytest.approx(o.mu - dist.Z80 * o.sigma, abs=0.06)
+    inside = ((rep.obs >= g.q10) & (rep.obs <= g.q90)).sum()
+    assert r["inside"]["t2m"] == {"n": 24, "k": int(inside)}
+    day = r["daily"]
+    assert [d["day"] for d in day] == [f"{inits[1]:%Y-%m-%d}"] and day[0]["reports"] == 20
+    assert day[0]["obs_max"] == round(rep.obs.iloc[:20].max(), 1)
+    assert "Last 7 days" in (c.paths.reports / "live.md").read_text()
 
 
 def test_check_with_no_reports_at_all_says_so(issued, monkeypatch):

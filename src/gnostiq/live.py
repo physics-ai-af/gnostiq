@@ -14,6 +14,8 @@ from gnostiq.io import Missing, fetch
 log = logging.getLogger("gnostiq")
 
 DAYS = 30
+RECENT = 7
+FULL_DAY = 18  # reported hours before a day's high and low mean anything
 OBS = {"t2m": "t", "td2m": "td"}
 HOUR = 3600
 
@@ -114,6 +116,49 @@ def summarize(j, key, core, refs, rng):
     return out, j
 
 
+def recent(c, a, rep, until, days=RECENT):
+    # the day-ahead forecast as the page showed it, hour by hour, next to what was reported
+    a = a[(a.lead_day == 1) & (a.valid > until - pd.Timedelta(days=days)) & a.system.isin(["gnostiq", "raw", "lapse"])]
+    a = a.sort_values("init").drop_duplicates(["valid", "var", "system"], keep="last")
+
+    def shown(col, sign):
+        # archives from before the band was saved fall back to the symmetric one
+        q = a[col] if col in a else pd.Series(np.nan, index=a.index)
+        return q.fillna(a.mu + sign * dist.Z80 * a.sigma)
+
+    a = a.assign(q10=shown("q10", -1), q90=shown("q90", 1))
+    g = a[a.system == "gnostiq"].set_index(["valid", "var"])[["q10", "mu", "q90"]].rename(columns={"mu": "q50"})
+    w = g.join(a[a.system != "gnostiq"].pivot_table(index=["valid", "var"], columns="system", values="mu"), how="outer")
+    w = w.join(rep.set_index(["valid", "var"]).obs, how="left").reset_index()
+
+    def val(x):
+        return None if pd.isna(x) else round(float(x), 1)
+
+    hourly = []
+    for v, h in w.groupby("valid"):
+        row = {"valid_utc": f"{v:%Y-%m-%dT%H:%MZ}"}
+        for _, r in h.iterrows():
+            row[r["var"]] = {k: val(r.get(k)) for k in ("obs", "q10", "q50", "q90", "raw", "lapse")}
+        hourly.append(row)
+
+    inside = {}
+    for var, h in w.dropna(subset=["obs", "q10", "q90"]).groupby("var"):
+        inside[var] = {"n": len(h), "k": int(((h.obs >= h.q10) & (h.obs <= h.q90)).sum())}
+
+    # highs and lows over the hours that were reported, so forecast and report cover the same hours
+    t = w[(w["var"] == "t2m")].dropna(subset=["obs", "q50"])
+    t = t.assign(day=t.valid.dt.tz_localize("UTC").dt.tz_convert(c.site.tz).dt.strftime("%Y-%m-%d"))
+    daily = []
+    for d, h in t.groupby("day"):
+        if len(h) < FULL_DAY:
+            continue
+        row = {"day": d, "reports": len(h)}
+        for col, name in (("obs", "obs"), ("q50", "gnostiq"), ("raw", "raw")):
+            row[f"{name}_max"], row[f"{name}_min"] = val(h[col].max()), val(h[col].min())
+        daily.append(row)
+    return {"days": days, "tz": c.site.tz, "hourly": hourly, "inside": inside, "daily": daily, "min_hours": FULL_DAY}
+
+
 def run(c, days=DAYS):
     a = archive(c)
     until = pd.Timestamp.now("UTC").tz_localize(None).floor("h")
@@ -132,7 +177,7 @@ def run(c, days=DAYS):
 
     out = {"site": c.site.name, "base": c.nwp.base, "since": f"{since:%Y-%m-%d}", "until": f"{until:%Y-%m-%dT%H:%MZ}",
            "issues": int(a.init.nunique()), "reports": int(rep.valid.nunique()),
-           "sources": sources(rep), "vars": out_vars}  # fmt: skip
+           "sources": sources(rep), "vars": out_vars, "recent": recent(c, a, rep, until)}  # fmt: skip
     c.paths.reports.mkdir(parents=True, exist_ok=True)
     (c.paths.reports / "live.json").write_text(json.dumps(out, indent=1))
     (c.paths.reports / "live.md").write_text(markdown(out))
@@ -162,5 +207,17 @@ def markdown(doc):
         out.append("")
         for ref, sk in v["skill"].items():
             out.append(f"CRPSS vs {ref}: {verify.skill_cell(sk)}")
+        out.append("")
+    r = doc.get("recent") or {}
+    if r.get("inside"):
+        out += [f"## Last {r['days']} days, day-ahead forecast against reports", ""]
+        for var, x in r["inside"].items():
+            out.append(f"- {var}: report inside Gnostiq's 80% range {x['k']} of {x['n']} times (expect about 80%)")
+        if r["daily"]:
+            out += ["", f"Highs and lows over the reported hours ({r['tz']} days):", "",
+                    "| day | reports | reported | Gnostiq | raw |", "|---|---|---|---|---|"]  # fmt: skip
+            for d in r["daily"]:
+                cells = [f"{d[f'{k}_max']} / {d[f'{k}_min']}" for k in ("obs", "gnostiq", "raw")]
+                out.append(f"| {d['day']} | {d['reports']} | " + " | ".join(cells) + " |")
         out.append("")
     return "\n".join(out)

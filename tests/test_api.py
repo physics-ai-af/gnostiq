@@ -45,7 +45,7 @@ def test_page_is_served_and_talks_to_the_api(site):
     _, client = site
     r = client.get("/")
     assert r.status_code == 200 and r.headers["content-type"].startswith("text/html")
-    assert "/api/sites" in r.text and "/api/${SITE.name}/${kind}" in r.text
+    assert "/api/sites" in r.text and "/api/${SITE.name}/${kind}" in r.text and "forecast and what happened" in r.text
     for kind in ("forecast", "verify", "cases", "live", "season"):
         assert f'api("{kind}")' in r.text
     assert "Open-Meteo" in r.text and "CHIRPS" in r.text

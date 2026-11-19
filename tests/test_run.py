@@ -89,7 +89,8 @@ def test_issued_rows_are_what_the_page_shows(trained):
     first = doc["hourly"][0]
     g = t[(t.system == "gnostiq") & (t["var"] == "t2m")].iloc[0]
     assert g.mu == first["t2m"]["q50"] and g.sigma > 0
-    assert t[t.system.str.startswith("raw")].sigma.isna().all()
+    assert (g.q10, g.q90) == (first["t2m"]["q10"], first["t2m"]["q90"])
+    assert t[t.system.str.startswith("raw")][["sigma", "q10", "q90"]].isna().all().all()
 
 
 def test_extra_models_feed_the_forecast_and_a_missing_one_is_survivable(trained):

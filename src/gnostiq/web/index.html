@@ -305,6 +305,7 @@ function renderLive(j) {
   const src = j.sources || {}, from = [src.nimet ? `${src.nimet} NiMet synops (0.1 °C)` : "", src.iem ? `${src.iem} airport METARs (whole degrees)` : ""].filter(Boolean).join(" and ");
   $("#lmeta").textContent = `Forecasts as this page showed them, scored against ${site} station reports that came in afterwards: ${j.issues} ${j.issues === 1 ? "day" : "days"} of forecasts since ${j.since}${from ? `, ${from}` : ""}.`;
   if (j.reports === 0) { el("div", { class: "empty" }, root, `No station reports from ${site} have come in since ${j.since}, so there is nothing to score yet.`); return; }
+  renderRecent(j, root, label);
   if (!t || !t.cases) { el("div", { class: "empty" }, root, "No reports matched yet. The first scores appear a day after the first forecast."); return; }
   if (t.daily.length) {
     const cmp = (SITE && SITE.compare) || [];
@@ -324,12 +325,50 @@ function renderLive(j) {
     if (!v || !v.cases) continue;
     const sc = el("div", { class: "card" }, root);
     const sk = Object.entries(v.skill).filter(([, s]) => s).map(([r, s]) => `${sx(s.skill)} vs ${label(r)} [${sx(s.lo)}, ${sx(s.hi)}]`);
-    el("h3", {}, sc, `${title}, ${v.cases} reports`);
-    el("div", { class: "sub" }, sc, sk.length ? `Gnostiq skill: ${sk.join("; ")}. An interval that includes zero is not yet evidence.` : "Too few days yet for a skill interval.");
+    el("h3", {}, sc, `${title}, ${v.cases} cases`);
+    el("div", { class: "sub" }, sc, (sk.length ? `Gnostiq skill: ${sk.join("; ")}. An interval that includes zero is not yet evidence.` : "Too few days yet for a skill interval.") + " A case is one report scored against one day's forecast.");
     const wrap = el("div", { class: "scroll", style: "margin-top:8px" }, sc);
     const rank = (s) => (ORDER.indexOf(s) + 1 || 99);
     const sys = Object.entries(v.systems).sort((a, b) => rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0]));
-    table(wrap, ["System", "Reports", "Bias °C", "Average error °C", "CRPS °C"], sys.map(([s, d]) => [label(s), d.n, fx(d.bias, 2), fx(d.mae, 2), fx(d.crps, 2)]));
+    table(wrap, ["System", "Cases", "Bias °C", "Average error °C", "CRPS °C"], sys.map(([s, d]) => [label(s), d.n, fx(d.bias, 2), fx(d.mae, 2), fx(d.crps, 2)]));
+  }
+}
+
+function renderRecent(j, root, label) {
+  const r = j.recent;
+  if (!r || !r.hourly.length) return;
+  const t = (s) => new Date(s).getTime(), h = r.hourly;
+  const dfmt = new Intl.DateTimeFormat("en-GB", { timeZone: r.tz, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const day = new Intl.DateTimeFormat("en-GB", { timeZone: r.tz, weekday: "short", day: "numeric" });
+  const hour = new Intl.DateTimeFormat("en-GB", { timeZone: r.tz, hour: "2-digit", hour12: false });
+  const x0 = t(h[0].valid_utc), x1 = t(h[h.length - 1].valid_utc);
+  const xt = h.filter((s) => hour.format(new Date(s.valid_utc)) === "12").map((s) => [t(s.valid_utc), day.format(new Date(s.valid_utc))]);
+  for (const [key, title] of [["t2m", "Temperature"], ["td2m", "Dewpoint"]]) {
+    const rows = h.filter((s) => s[key]), got = rows.filter((s) => s[key].obs != null);
+    if (!got.length) continue;
+    const ins = r.inside[key];
+    const sub = "The forecast made up to a day ahead, as the page showed it, against what was reported." + (ins ? ` Reports inside Gnostiq's 80% range: ${ins.k} of ${ins.n}. About 80% is right; much less means the range is too narrow.` : "");
+    const c = card(root, `${title}: forecast and what happened, last ${r.days} days, °C`, sub, [["Gnostiq, 80% range", COLOR.gnostiq], [label("raw"), COLOR.raw], ["Reported", "var(--text)"]]);
+    lineChart(c.body, {
+      label: `${title} forecast against reports`, x0, x1, xticks: xt, xfmt: (x) => dfmt.format(new Date(x)), tfmt: (p) => fx(p[1]) + " °C",
+      series: [
+        { name: "Gnostiq 80% range", color: COLOR.gnostiq, noLine: true, pts: [], band: rows.filter((s) => s[key].q10 != null).map((s) => [t(s.valid_utc), s[key].q10, s[key].q90]) },
+        { name: "Gnostiq", color: COLOR.gnostiq, pts: rows.map((s) => [t(s.valid_utc), s[key].q50]) },
+        { name: label("raw"), color: COLOR.raw, thin: 1, pts: rows.map((s) => [t(s.valid_utc), s[key].raw]) },
+        { name: "Reported", color: "var(--text)", noLine: true, dots: 1, pts: got.map((s) => [t(s.valid_utc), s[key].obs]) },
+      ],
+    });
+    const inRange = (v) => (v.q10 == null ? "-" : v.obs >= v.q10 && v.obs <= v.q90 ? "yes" : "no");
+    table(c.tv, ["Time", "Reported", "Gnostiq", "80% range", label("raw"), "In range"], got.map((s) => { const v = s[key]; return [dfmt.format(new Date(s.valid_utc)), fx(v.obs), fx(v.q50), `${fx(v.q10)} to ${fx(v.q90)}`, fx(v.raw), inRange(v)]; }));
+  }
+  if (!r.daily.length && h.some((s) => s.t2m && s.t2m.obs != null)) el("p", { class: "sub" }, root, `No day had ${r.min_hours} or more reported hours, so there are no daily highs and lows to compare.`);
+  if (r.daily.length) {
+    const sc = el("div", { class: "card" }, root);
+    el("h3", {}, sc, "Daily high and low temperature, °C");
+    el("div", { class: "sub" }, sc, `Taken over the hours that were reported, so forecast and report cover the same hours. Days with fewer than ${r.min_hours} reported hours are left out.`);
+    const wrap = el("div", { class: "scroll", style: "margin-top:8px" }, sc);
+    table(wrap, ["Day", "Hours", "High reported", "High Gnostiq", `High ${label("raw")}`, "Low reported", "Low Gnostiq", `Low ${label("raw")}`],
+      r.daily.map((d) => [d.day, d.reports, fx(d.obs_max), fx(d.gnostiq_max), fx(d.raw_max), fx(d.obs_min), fx(d.gnostiq_min), fx(d.raw_min)]));
   }
 }
 

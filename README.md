@@ -1050,7 +1050,7 @@ Two decisions worth knowing about:
 
 `lapse` is the base model moved to the site's height and nothing else, the physics on its own. `trained_at` names the site the networks were trained for. `models` holds each extra model's raw forecast, fetched live, so the page can draw them next to Gnostiq; a model that is down shows as missing and the forecast still runs. `clim` is the usual range for that hour and date from the station record, and needs `interim/obs.parquet`; a site without a record has none.
 
-The file is written to a temporary name and renamed, so the web server never reads half a file. Each run also saves what it issued to `archive/<init>.parquet`: one row per system, variable and hour, exactly as the page showed it.
+The file is written to a temporary name and renamed, so the web server never reads half a file. Each run also saves what it issued to `archive/<init>.parquet`: one row per system, variable and hour, exactly as the page showed it (`mu`, `sigma`, and the band as drawn in `q10` and `q90`). Nothing is ever deleted from it, so `check --days` can look back as far as the archive goes.
 
 ### Live check
 
@@ -1091,6 +1091,8 @@ pdm run gnostiq check
 ```
 
 scores those saved forecasts against the station reports that came in afterwards, over the last 30 days (`--days` changes that). It keeps the first forecast issued on each UTC day so a day of 3-hourly runs counts once, and scores Gnostiq, each raw model, the height-corrected base model and the normal range on the same reports. It writes `live.json` and `live.md` beside the forecast; the page shows them under "Last 30 days".
+
+The same report also puts forecast and outcome side by side for the last 7 days, under `recent` in `live.json`: for every hour, the day-ahead forecast as shown (Gnostiq's median and 80% band, raw and height-corrected ECMWF) next to the report, how often the report fell inside the band, and each day's high and low as reported and as forecast. Highs and lows are taken over the reported hours only, so both sides cover the same hours, and only on days with at least 18 of them; a daytime-only station never gets one. On the page this is a chart per variable with the reports as dots over the band, and a table of every report.
 
 Reports come from two places, and the first wins where both have the hour:
 
@@ -1353,7 +1355,7 @@ The API only reads files. A report that has not been generated yet returns 404 w
 The page is one HTML file with no build step and no external scripts. With more than one site there is a switcher at the top. It has five parts:
 
 - **Forecast**: temperature and dewpoint with the 10th to 90th percentile band next to the raw models, and the daily chance of rain. The models in `nwp.compare` sit behind a "Show more models" button, so the default chart stays readable. For a site on borrowed networks a note says where they were trained and that the site is unverified, and the height-corrected base model is drawn too.
-- **Last 30 days**: the live check.
+- **Last 30 days**: the live check. First what the page forecast a day ahead against what was reported, hour by hour over the last week, with daily highs and lows; then error by day and the score tables.
 - **Season check**: a whole past season against NiMet reports, CRPS by lead day and the score table.
 - **Verification**: skill by lead time with its intervals, the score table, a reliability diagram for rain, and the rain scores against TAMSAT when it has been pulled. The selector switches variable; `#t2m`, `#td2m` and `#tp24` in the address deep-link to one.
 - **Heavy-rain cases**: one small chart per replayed day.
