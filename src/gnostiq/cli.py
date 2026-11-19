@@ -10,19 +10,25 @@ log = logging.getLogger("gnostiq")
 OWN = {"build", "baselines", "train", "curve", "verify", "cases", "all"}
 
 SOURCES = ["static", "station", "nwp", "precip"]
+# pulled only when named
+OPTIONAL = []
+OPTIONAL = ["tamsat", "nimet"]
 
 
 def pull(c, a):
     from gnostiq.ingest import nwp, precip, static, station
 
     mods = {"static": static, "station": station, "nwp": nwp, "precip": precip}
+    from gnostiq.ingest import nimet, tamsat
+
+    mods.update(tamsat=tamsat, nimet=nimet)
     only = a.only.split(",") if a.only else SOURCES
     if c.donor and not a.only:
         # a site on borrowed networks needs only its own terrain height
         only = ["static"]
     bad = [s for s in only if s not in mods]
     if bad:
-        raise SystemExit(f"unknown source {bad}; choose from {SOURCES}")
+        raise SystemExit(f"unknown source {bad}; choose from {SOURCES + OPTIONAL}")
     for s in only:
         # chirps only matters when it is the rain truth
         if s == "precip" and c.truth.rain != "chirps" and not a.only:
@@ -98,6 +104,12 @@ def check(c, a):
     each(c, a, lambda x: live.run(x, a.days))
 
 
+def season(c, a):
+    from gnostiq import season
+
+    each(c, a, lambda x: season.run(x, a.start, a.end))
+
+
 def everything(c, a):
     for step in (build, baselines, train, verify, cases):
         step(c, a)
@@ -122,7 +134,7 @@ def main(argv=None):
         return s
 
     s = add("pull", pull, "download raw data (cached; safe to re-run)")
-    s.add_argument("--only", help=f"comma-separated subset of {','.join(SOURCES)}")
+    s.add_argument("--only", help=f"comma-separated subset of {','.join(SOURCES + OPTIONAL)}")
     s.add_argument("--refresh", action="store_true", help="re-download files that change over time")
     add("build", build, "parse raw files into the working tables")
     add("baselines", baselines, "fit the reference forecasts")
@@ -136,6 +148,10 @@ def main(argv=None):
     k = add("check", check, "score past forecasts against reports that came in since")
     k.add_argument("--days", type=int, default=30)
     k.add_argument("--all-sites", action="store_true", help="every gnostiq*.toml beside the config")
+    s = add("season", season, "score a past season against NiMet reports (default: the latest wet season)")
+    s.add_argument("--start", help="first day, YYYY-MM-DD")
+    s.add_argument("--end", help="last day, YYYY-MM-DD")
+    s.add_argument("--all-sites", action="store_true", help="every gnostiq*.toml beside the config")
     s = add("serve", serve, "serve the API and web page")
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--port", type=int, default=8000)

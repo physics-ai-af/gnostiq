@@ -77,6 +77,26 @@ def test_pull_requests_every_lead_for_every_variable(archive):
     assert {g for m, g, _ in calls if m != "ecmwf_ifs025"} == {"core"}
 
 
+def test_compared_models_are_pulled_for_the_scored_fields_only(tmp_path, monkeypatch):
+    extra = 'extra = ["gfs_seamless", "icon_seamless"]'
+    c = cfg.load(write_cfg(tmp_path, {extra: extra + '\ncompare = ["jma_gsm"]'}))
+    calls = []
+
+    def fetch(url, path, params=None, max_age=None, **kw):
+        calls.append((params["models"], path.name.split("_")[0], params["hourly"]))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}")
+        return path
+
+    monkeypatch.setattr(nwp, "fetch", fetch)
+    monkeypatch.setattr(nwp.time, "sleep", lambda s: None)
+    nwp.pull(c)
+    jma = [x for x in calls if x[0] == "jma_gsm"]
+    assert {g for _, g, _ in jma} == {"point"}
+    names = {v.rsplit("_previous_day", 1)[0] for v in jma[0][2].split(",")}
+    assert names == {"temperature_2m", "dew_point_2m", "precipitation"}
+
+
 def test_pull_refetches_unreadable_chunks(archive):
     c, _, _ = archive
     broken = c.paths.raw / "nwp" / c.nwp.base / "core_2024-01-01_2024-04-01.json"
@@ -117,7 +137,7 @@ def test_pull_tolerates_a_refused_extra_model(archive):
 def test_build_assembles_one_row_per_valid_time_and_lead(nwp_raw):
     c = nwp_raw
     out = nwp.build(c)
-    assert set(out) == {c.nwp.base, *c.nwp.extra}
+    assert set(out) == {c.nwp.base, *c.nwp.extra, *c.nwp.compare}
     df = pd.read_parquet(c.paths.interim / f"nwp_{c.nwp.base}.parquet")
     assert not df.duplicated(["valid", "lead_day"]).any() and set(df.lead_day) == set(c.lead_days)
     assert df.valid.min() == pd.Timestamp(c.nwp.start) and df.f_t2m.notna().all()

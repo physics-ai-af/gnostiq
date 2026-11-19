@@ -29,11 +29,12 @@ def test_reports_are_served_as_written(site):
         "scorecard.json": {"meta": {"site": "jos"}},
         "cases.json": {"cases": []},
         "live.json": {"site": "jos", "vars": {}},
+        "season.json": {"site": "jos", "window": ["2026-04-01", "2026-10-31"]},
     }
     for name, doc in docs.items():
         (c.paths.reports / name).write_text(json.dumps(doc))
     pairs = [("/api/forecast", "forecast.json"), ("/api/verify", "scorecard.json"), ("/api/cases", "cases.json"),
-             ("/api/live", "live.json")]  # fmt: skip
+             ("/api/live", "live.json"), ("/api/jos/season", "season.json")]  # fmt: skip
     for url, name in pairs:
         r = client.get(url)
         assert r.status_code == 200 and r.json() == docs[name] and "max-age" in r.headers["cache-control"]
@@ -45,7 +46,7 @@ def test_page_is_served_and_talks_to_the_api(site):
     r = client.get("/")
     assert r.status_code == 200 and r.headers["content-type"].startswith("text/html")
     assert "/api/sites" in r.text and "/api/${SITE.name}/${kind}" in r.text
-    for kind in ("forecast", "verify", "cases", "live"):
+    for kind in ("forecast", "verify", "cases", "live", "season"):
         assert f'api("{kind}")' in r.text
     assert "Open-Meteo" in r.text and "CHIRPS" in r.text
     # the sites come from the configs, so one page serves any of them
@@ -74,6 +75,7 @@ def test_every_site_beside_the_config_is_served(tmp_path):
         (x.paths.reports / "forecast.json").write_text(json.dumps({"init_utc": x.site.name, "hourly": []}))
     client = TestClient(api.create(c))
     sites = client.get("/api/sites").json()
+    assert all(s["compare"] == list(c.nwp.compare) for s in sites)
     assert [(s["name"], s["trained_at"], s["config"]) for s in sites] == [
         ("jos", "jos", "gnostiq.toml"), ("nearby", "jos", "gnostiq-nearby.toml")]  # fmt: skip
     assert client.get("/api/nearby/forecast").json()["init_utc"] == "nearby"

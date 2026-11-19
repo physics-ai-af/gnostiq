@@ -9,7 +9,13 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from gnostiq import cfg
 
 WEB = Path(__file__).parent / "web"
-REPORTS = {"forecast": "forecast.json", "verify": "scorecard.json", "cases": "cases.json", "live": "live.json"}
+REPORTS = {
+    "forecast": "forecast.json",
+    "verify": "scorecard.json",
+    "cases": "cases.json",
+    "live": "live.json",
+    "season": "season.json",
+}
 
 
 def create(c=None):
@@ -33,7 +39,7 @@ def create(c=None):
     @app.get("/api/sites")
     def listing():
         return [{"name": n, "trained_at": x.donor or n, "config": x.source.name, "lat": x.site.lat, "lon": x.site.lon,
-                 "elev_m": x.site.elev} for n, x in sites.items()]  # fmt: skip
+                 "elev_m": x.site.elev, "compare": list(x.nwp.compare)} for n, x in sites.items()]  # fmt: skip
 
     @app.get("/api/{site}/{kind}")
     def per_site(site: str, kind: str):

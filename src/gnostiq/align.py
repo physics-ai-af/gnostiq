@@ -38,9 +38,9 @@ def split(c, day):
     return lab
 
 
-def extras(c):
+def extras(c, models=None):
     out = {}
-    for m in c.nwp.extra:
+    for m in c.nwp.extra if models is None else models:
         path = c.paths.interim / f"nwp_{m}.parquet"
         if path.exists():
             out[m] = pd.read_parquet(path, columns=["valid", "lead_day", "f_t2m", "f_td2m"])

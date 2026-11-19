@@ -10,6 +10,7 @@
   --surface: #fcfcfb; --card: #ffffff; --rule: #e7e6e2; --text: #0b0b0b; --text2: #52514e; --text3: #7b7a75;
   --gnostiq: #2a78d6; --raw: #eb6834; --emos: #1baf7a; --band: #cde2fb; --p1: #86b6ef; --p2: #1c5cab;
   --icon: #8a5cd0; --gfs: #a88400; --normal: #ecebe7; --emos2: #138a9e; --lapse: #b3305f; --note: #f4f3ef;
+  --aifs: #0f7f6b; --arpege: #5a6fb0; --jma: #9a5b2e; --gem: #6b8f2a;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -17,6 +18,7 @@
     --surface: #1a1a19; --card: #222220; --rule: #383835; --text: #f0efec; --text2: #c3c2b7; --text3: #8f8e86;
     --gnostiq: #3987e5; --raw: #d95926; --emos: #199e70; --band: #184f95; --p1: #86b6ef; --p2: #256abf;
     --icon: #a07ee6; --gfs: #c9a227; --normal: #30302d; --emos2: #3cb6c9; --lapse: #e0608e; --note: #2a2a28;
+    --aifs: #3cc4a8; --arpege: #8fa2e0; --jma: #d08a55; --gem: #9cc456;
   }
 }
 * { box-sizing: border-box; }
@@ -71,6 +73,10 @@ a { color: inherit; }
   <p id="lmeta"></p>
   <div id="live"></div>
 
+  <h2 id="shead">Season check</h2>
+  <p id="smeta"></p>
+  <div id="season"></div>
+
   <h2>Verification</h2>
   <p id="vmeta"></p>
   <div class="filters" id="filters"><label class="sub" for="var">Variable</label>
@@ -82,7 +88,7 @@ a { color: inherit; }
   <div id="cases"></div>
 
   <footer>
-    Forecast input: Open-Meteo (CC BY 4.0), ECMWF open data. Observations: NOAA GHCNh, Iowa Environmental Mesonet. Rainfall: CHIRPS v3, Climate Hazards Center.
+    Forecast input: Open-Meteo (CC BY 4.0), ECMWF open data. Observations: NOAA GHCNh, Iowa Environmental Mesonet, Nigerian Meteorological Agency (WIS2). Rainfall: CHIRPS v3, Climate Hazards Center; TAMSAT v3.1, University of Reading.
     <a href="/method">Method note</a>.
   </footer>
 </main>
@@ -93,12 +99,13 @@ const NAMES = { gnostiq: "Gnostiq", raw: "Raw model", emos: "EMOS", emos_multi: 
 const ORDER = ["gnostiq", "raw", "emos", "emos_multi", "lapse", "persist", "clim"];
 const LABEL = (s) => NAMES[s] || (s.startsWith("raw:") ? `${MODEL[s.slice(4)] || s.slice(4)} (raw)` : s);
 const label = LABEL;
-const COLOR = { gnostiq: "var(--gnostiq)", raw: "var(--raw)", emos: "var(--emos)", emos_multi: "var(--emos2)", "raw:icon_seamless": "var(--icon)", "raw:gfs_seamless": "var(--gfs)", clim: "var(--text3)", lapse: "var(--lapse)" };
-const MODEL = { icon_seamless: "ICON", gfs_seamless: "GFS", ecmwf_ifs025: "ECMWF" };
+const COLOR = { gnostiq: "var(--gnostiq)", raw: "var(--raw)", emos: "var(--emos)", emos_multi: "var(--emos2)", "raw:icon_seamless": "var(--icon)", "raw:gfs_seamless": "var(--gfs)", clim: "var(--text3)", lapse: "var(--lapse)",
+  "raw:ecmwf_aifs025_single": "var(--aifs)", "raw:meteofrance_arpege_world": "var(--arpege)", "raw:jma_gsm": "var(--jma)", "raw:gem_global": "var(--gem)" };
+const MODEL = { icon_seamless: "ICON", gfs_seamless: "GFS", ecmwf_ifs025: "ECMWF", ecmwf_aifs025_single: "ECMWF AIFS", meteofrance_arpege_world: "ARPEGE", jma_gsm: "JMA", gem_global: "GEM" };
 const $ = (s) => document.querySelector(s);
 const tip = $("#tip");
 const cap = (n) => n.charAt(0).toUpperCase() + n.slice(1);
-let SITE = null;
+let SITE = null, SHOW_ALL = false;
 const borrowed = () => SITE && SITE.trained_at !== SITE.name;
 
 function el(tag, attrs = {}, parent, text) {
@@ -245,7 +252,7 @@ function renderForecast(f) {
   const root = $("#forecast");
   root.replaceChildren();
   const lent = borrowed(), here = cap(f.site.name), from = cap(f.trained_at || ""), base = MODEL[f.base_model] || f.base_model;
-  if (lent) el("p", { class: "note" }, root, `${here} has no public station record good enough to train on or score against. This forecast runs the networks trained at ${from} on ${here}'s own ${base} forecast, after moving it to ${here}'s height ("${base} at ${here} height" below). The band is ${from}'s uncertainty and is probably too narrow here. "Last 30 days" is the only check on it.`);
+  if (lent) el("p", { class: "note" }, root, `${here} has no public station record good enough to train on or score against. This forecast runs the networks trained at ${from} on ${here}'s own ${base} forecast, after moving it to ${here}'s height ("${base} at ${here} height" below). The band is ${from}'s uncertainty and is probably too narrow here. The season check and "Last 30 days" below are the only checks on it.`);
   const tz = f.site.tz, t = (s) => new Date(s).getTime();
   const dfmt = new Intl.DateTimeFormat("en-GB", { timeZone: tz, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   const day = new Intl.DateTimeFormat("en-GB", { timeZone: tz, weekday: "short", day: "numeric" });
@@ -255,7 +262,12 @@ function renderForecast(f) {
   const x0 = t(h[0].valid_utc), x1 = t(h[h.length - 1].valid_utc), xt = [];
   for (const s of h) { const d = new Date(s.valid_utc); if (new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", hour12: false }).format(d) === "12") xt.push([d.getTime(), day.format(d)]); }
 
-  const others = Object.keys(h[0].models || {}), hasClim = !!h[0].clim;
+  const all = Object.keys(h[0].models || {}), hasClim = !!h[0].clim, cmp = (SITE && SITE.compare) || [];
+  const others = SHOW_ALL ? all : all.filter((m) => !cmp.includes(m)), hidden = all.length - others.length;
+  if (all.some((m) => cmp.includes(m))) {
+    const b = el("button", { type: "button", style: "margin-top:10px" }, root, SHOW_ALL ? "Fewer models" : `Show ${hidden} more models`);
+    b.onclick = () => { SHOW_ALL = !SHOW_ALL; renderForecast(f); };
+  }
   for (const [key, title] of [["t2m", "Temperature, °C"], ["td2m", "Dewpoint, °C"]]) {
     const legend = [["Gnostiq", COLOR.gnostiq], [`${base} (raw)`, COLOR.raw], ...others.map((m) => [`${MODEL[m] || m} (raw)`, COLOR[`raw:${m}`] || "var(--text3)"])];
     if (lent) legend.push([`${base} at ${here} height`, COLOR.lapse]);
@@ -290,11 +302,13 @@ function renderLive(j) {
   root.replaceChildren();
   const t = j.vars.t2m, site = cap(j.site), base = MODEL[j.base] || j.base;
   const label = (s) => (s === "raw" ? `${base} (raw)` : s === "lapse" ? `${base} at ${site} height` : LABEL(s));
-  $("#lmeta").textContent = `Forecasts as this page showed them, scored against ${site} airport reports that came in afterwards: ${j.issues} ${j.issues === 1 ? "day" : "days"} of forecasts since ${j.since}. Reports are whole degrees.`;
-  if (j.reports === 0) { el("div", { class: "empty" }, root, `No airport reports from ${site} have come in since ${j.since}, so there is nothing to score yet.`); return; }
+  const src = j.sources || {}, from = [src.nimet ? `${src.nimet} NiMet synops (0.1 °C)` : "", src.iem ? `${src.iem} airport METARs (whole degrees)` : ""].filter(Boolean).join(" and ");
+  $("#lmeta").textContent = `Forecasts as this page showed them, scored against ${site} station reports that came in afterwards: ${j.issues} ${j.issues === 1 ? "day" : "days"} of forecasts since ${j.since}${from ? `, ${from}` : ""}.`;
+  if (j.reports === 0) { el("div", { class: "empty" }, root, `No station reports from ${site} have come in since ${j.since}, so there is nothing to score yet.`); return; }
   if (!t || !t.cases) { el("div", { class: "empty" }, root, "No reports matched yet. The first scores appear a day after the first forecast."); return; }
   if (t.daily.length) {
-    const sys = ["gnostiq", "raw", ...(borrowed() ? ["lapse"] : []), ...Object.keys(t.systems).filter((s) => s.startsWith("raw:")), "clim"].filter((s) => t.systems[s]);
+    const cmp = (SITE && SITE.compare) || [];
+    const sys = ["gnostiq", "raw", ...(borrowed() ? ["lapse"] : []), ...Object.keys(t.systems).filter((s) => s.startsWith("raw:") && !cmp.includes(s.slice(4))), "clim"].filter((s) => t.systems[s]);
     const days = t.daily.map((d) => d.day), X = (d) => days.indexOf(d);
     const c = card(root, "Temperature: average error by day, °C", "Lower is better. Every system on the same reports.", sys.map((s) => [label(s), COLOR[s] || "var(--text3)"]));
     lineChart(c.body, {
@@ -316,6 +330,41 @@ function renderLive(j) {
     const rank = (s) => (ORDER.indexOf(s) + 1 || 99);
     const sys = Object.entries(v.systems).sort((a, b) => rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0]));
     table(wrap, ["System", "Reports", "Bias °C", "Average error °C", "CRPS °C"], sys.map(([s, d]) => [label(s), d.n, fx(d.bias, 2), fx(d.mae, 2), fx(d.crps, 2)]));
+  }
+}
+
+function renderSeason(j) {
+  const root = $("#season");
+  root.replaceChildren();
+  const site = cap(j.site), base = MODEL[j.base] || j.base, st = j.station || {};
+  const label = (s) => (s === "raw" ? `${base} (raw)` : s === "lapse" ? `${base} at ${site} height` : LABEL(s));
+  const hrs = Object.keys(j.hours || {}).map(Number), pad = (h) => String(h).padStart(2, "0");
+  const span = hrs.length ? `, reported between ${pad(Math.min(...hrs))} and ${pad(Math.max(...hrs))} UTC` : "";
+  $("#shead").textContent = `Season check, ${j.window[0].slice(0, 4)}`;
+  $("#smeta").textContent = `What each system would have issued from the archived forecasts, ${j.window[0]} to ${j.window[1]}, scored against ${j.reports} NiMet reports from station ${st.wigos}${st.km != null ? ` (${st.km} km from the forecast point)` : ""}${span}. The networks were trained at ${cap(j.trained_at)} up to ${j.train_end}; none of this season was seen in training.`;
+  if (!j.reports) { el("div", { class: "empty" }, root, "No NiMet reports for this season."); return; }
+  const rank = (s) => (ORDER.indexOf(s) + 1 || 99);
+  for (const [key, title] of [["t2m", "Temperature"], ["td2m", "Dewpoint"]]) {
+    const v = j.vars[key];
+    if (!v || !v.cases) continue;
+    const sys = ["gnostiq", "emos", "emos_multi", "lapse", "raw", "clim"].filter((s) => v.by_lead[s] && v.systems[s]);
+    const leads = [...new Set(sys.flatMap((s) => Object.keys(v.by_lead[s]).map(Number)))].sort((a, b) => a - b);
+    if (leads.length) {
+      const c = card(root, `${title}: CRPS by lead day, °C`, `Lower is better. ${v.cases} cases (reports times lead days), every system on the same ones.`, sys.map((s) => [label(s), COLOR[s] || "var(--text3)"]));
+      lineChart(c.body, {
+        label: `${title} CRPS by lead day`, x0: leads[0] - 0.4, x1: leads[leads.length - 1] + 0.4, ymin: 0, h: 210,
+        xticks: leads.map((l) => [l, `day ${l}`]), xfmt: (x) => `Lead day ${x}`, tfmt: (p) => fx(p[1], 2) + " °C",
+        series: sys.map((s) => ({ name: label(s), color: COLOR[s] || "var(--text3)", dots: 1, thin: s !== "gnostiq", pts: leads.map((l) => [l, v.by_lead[s][l] ? v.by_lead[s][l].crps : null]) })),
+      });
+      table(c.tv, ["Lead day", ...sys.map(label)], leads.map((l) => [l, ...sys.map((s) => (v.by_lead[s][l] ? fx(v.by_lead[s][l].crps, 2) : "-"))]));
+    }
+    const sc = el("div", { class: "card" }, root);
+    const sk = Object.entries(v.skill).filter(([, s]) => s).map(([r, s]) => `${sx(s.skill)} vs ${label(r)} [${sx(s.lo)}, ${sx(s.hi)}]`);
+    el("h3", {}, sc, `${title}, ${v.cases} cases`);
+    el("div", { class: "sub" }, sc, sk.length ? `Gnostiq skill: ${sk.join("; ")}. An interval that includes zero is not evidence.` : "Too few days for a skill interval.");
+    const wrap = el("div", { class: "scroll", style: "margin-top:8px" }, sc);
+    const all = Object.entries(v.systems).sort((a, b) => rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0]));
+    table(wrap, ["System", "Cases", "Bias °C", "Average error °C", "CRPS °C"], all.map(([s, d]) => [label(s), d.n, fx(d.bias, 2), fx(d.mae, 2), fx(d.crps, 2)]));
   }
 }
 
@@ -351,6 +400,15 @@ function renderVerify() {
   const sys = Object.entries(blk.systems).sort((a, b) => rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0]));
   if (rain) table(wrap, ["System", "Cases", "Brier wet", "Brier heavy", "CRPS mm", "ETS wet", "ETS heavy"], sys.map(([s, d]) => [label(s), d.overall.n, fx(d.overall.brier1, 3), fx(d.overall.brier10, 3), fx(d.overall.crps, 2), fx(d.overall.ets1, 2), fx(d.overall.ets10, 2)]));
   else table(wrap, ["System", "Cases", "Bias °C", "MAE °C", "CRPS °C", "80% interval coverage"], sys.map(([s, d]) => [label(s), d.overall.n, fx(d.overall.bias, 2), fx(d.overall.mae, 2), fx(d.overall.crps, 2), d.overall.cov80 == null ? "-" : Math.round(d.overall.cov80 * 100) + "%"]));
+  if (rain && blk.alt) {
+    const a = blk.alt, c2 = el("div", { class: "card" }, root);
+    const sk = Object.entries(a.skill.crpss || {}).filter(([, s]) => s.overall).map(([r, s]) => `${sx(s.overall.skill)} vs ${NAMES[r] || r} [${sx(s.overall.lo)}, ${sx(s.overall.hi)}]`);
+    el("h3", {}, c2, `The same forecasts scored against ${a.truth.toUpperCase()}`);
+    el("div", { class: "sub" }, c2, `Gnostiq, EMOS and the climatology were fitted to ${m.truth.rain}. A second satellite product shows how much the rain scores depend on that choice. ${a.n_cases} cases${sk.length ? `; Gnostiq CRPS skill ${sk.join("; ")}` : ""}.`);
+    const w2 = el("div", { class: "scroll", style: "margin-top:8px" }, c2);
+    const s2 = Object.entries(a.systems).sort((x, y) => rank(x[0]) - rank(y[0]) || x[0].localeCompare(y[0]));
+    table(w2, ["System", "Cases", "Brier wet", "Brier heavy", "CRPS mm"], s2.map(([s, d]) => [label(s), d.overall.n, fx(d.overall.brier1, 3), fx(d.overall.brier10, 3), fx(d.overall.crps, 2)]));
+  }
 
   if (rain && blk.reliability && blk.reliability.gnostiq) {
     const names = ORDER.filter((s) => blk.reliability[s]);
@@ -409,6 +467,7 @@ async function start() {
   const api = (kind) => `/api/${SITE.name}/${kind}`, cfg = SITE === sites[0] ? "" : ` --config ${SITE.config}`;
   load(api("forecast"), "#forecast", renderForecast, `gnostiq${cfg} run`);
   load(api("live"), "#live", renderLive, `gnostiq${cfg} check`);
+  load(api("season"), "#season", renderSeason, `gnostiq${cfg} season`);
   if (borrowed()) {
     const home = sites.find((s) => s.name === SITE.trained_at), link = home ? `?site=${home.name}` : null;
     $("#filters").style.display = "none";

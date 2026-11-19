@@ -45,13 +45,25 @@ CRPS for all three variables, Brier score and equitable threat score at the wet 
 
 ## Sites without a record
 
-Jos has no public station record that can serve as truth, so nothing can be trained or scored there. It runs the networks trained at Abuja on its own ECMWF forecast, after its own terrain correction. The physics part is Jos's: the model grid sits about 110 m below the Jos airport, against 23 m at Abuja. The learned part and the spread are Abuja's. The networks never saw a plateau site, and Jos inputs sit at the cool edge of the Abuja training data, so the correction may not carry over and the spread is probably too narrow.
+Jos has no long public station record that can serve as truth, so nothing is trained there. It runs the networks trained at Abuja on its own ECMWF forecast, after its own terrain correction. The physics part is Jos's: the model grid sits well below the plateau (1182 m for the cell the old Jos point fell in, against 1290 m at the airport; `pull --only static` measures the cell actually used), where at Abuja the gap is 23 m. The learned part and the spread are Abuja's. The networks never saw a plateau site, and Jos inputs sit at the cool edge of the Abuja training data, so the correction may not carry over and the spread is probably too narrow.
 
-The page shows the height-corrected ECMWF beside it and labels the forecast unverified. If airport reports from Jos come in, the live check scores the two against each other, which tests the one thing worth knowing: whether what was learned at Abuja adds anything at Jos beyond the physics.
+The page shows the height-corrected ECMWF beside it and labels the forecast unverified. The season check and the live check score the two against each other, which tests the one thing worth knowing: whether what was learned at Abuja adds anything at Jos beyond the physics.
+
+## Season check
+
+NiMet has published its synops through a WIS2 node since early 2026, in tenths of a degree. The season check rebuilds what every system would have issued over a whole season from the forecast archive and scores it against those reports. For Abuja the 2026 wet season is a second test it never saw; for Jos it is the first. At Jos the station reports by day only, so the night is unscored, and its listed position is 25 km from the airport the forecast is made for. ECMWF changed model cycle on 12 May 2026, inside that season and after training, so monthly scores are kept to show any shift.
+
+## Other models
+
+AIFS (ECMWF's machine-learning model), ARPEGE, JMA and GEM are scored raw next to everything else and drawn on the page, but never fed to the networks: adding or dropping one needs no retrain. AIFS has 6-hourly steps, interpolated to hours, which flattens the daily cycle.
+
+## Rain truth
+
+Every rain system is fitted to CHIRPS. Scoring the same forecasts against TAMSAT, a second satellite estimate built a different way, separates skill from agreement with one product.
 
 ## Limits a reader should know
 
-- One verified site. Jos runs on Abuja's networks unverified. Nothing here shows the method transfers to other terrain or climate zones.
+- One site with a training record. Jos runs on Abuja's networks, checked only by day and only against one 2026 season. Beyond that, nothing here shows the method transfers to other terrain or climate zones.
 - The forecast archive starts in early 2024, so training has at most about two years of pairs, and there is one test wet season. Confidence intervals are correspondingly wide for rain.
 - Public station reports from Nigeria thin out from April 2026, so the Abuja test season is 2025.
 - ECMWF changed the IFS cycle on 12 May 2026. A test window that spans that date mixes two model versions; the 2025 Abuja season does not.

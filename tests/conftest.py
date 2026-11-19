@@ -19,7 +19,7 @@ SMALL = {
     "train_end = 2026-03-31": "train_end = 2024-12-31",
     "test_start = 2026-04-01": "test_start = 2025-04-01",
     "test_end = 2026-10-31": "test_end = 2025-06-30",
-    'extra = ["gfs_seamless", "icon_seamless"]': 'extra = ["gfs_seamless"]',
+    'extra = ["gfs_seamless", "icon_seamless"]': 'extra = ["gfs_seamless"]\ncompare = ["jma_gsm"]',
     "lead_days = [1, 2, 3, 4, 5, 6, 7]": "lead_days = [1, 3]",
     "seeds = 3": "seeds = 1",
     "hidden = 64": "hidden = 16",

@@ -85,3 +85,26 @@ def test_scorecard_from_baselines_alone(based, tmp_path):
     assert json.loads((c.paths.reports / "scorecard.json").read_text())["meta"] == card["meta"]
     text = (c.paths.reports / "scorecard.md").read_text()
     assert "## t2m" in text and "## tp24" in text and "| emos |" in text
+
+
+def test_rain_is_also_scored_against_a_second_truth(based, tmp_path):
+    import shutil
+    from dataclasses import replace
+
+    from gnostiq.cfg import Paths
+    from gnostiq.ingest import precip, tamsat
+
+    c = replace(based, paths=Paths(tmp_path))
+    c.paths.ensure()
+    for name in ("pred_hourly_base.parquet", "pred_daily_base.parquet"):
+        shutil.copy(based.paths.processed / name, c.paths.processed / name)
+    assert "alt" not in verify.run(c)["daily"]
+    chirps = pd.read_parquet(precip.cache(based))
+    tamsat.cache(c).parent.mkdir(parents=True, exist_ok=True)
+    chirps.assign(tp24=chirps.tp24 * 1.3).to_parquet(tamsat.cache(c), index=False)
+    card = verify.run(c)
+    a = card["daily"]["alt"]
+    assert a["truth"] == "tamsat" and a["n_cases"] == card["daily"]["n_cases"]
+    assert set(a["systems"]) == set(card["daily"]["systems"])
+    assert a["base_rate"]["wet"] >= card["daily"]["base_rate"]["wet"]
+    assert "tp24 against tamsat" in (c.paths.reports / "scorecard.md").read_text()

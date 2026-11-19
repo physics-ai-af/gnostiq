@@ -32,6 +32,11 @@ def test_the_repo_configs_are_valid():
         ('temp = "merged"', 'temp = "era5"', "truth.temp"),
         ('rain = "chirps"', 'rain = "imerg"', "truth.rain"),
         ('extra = ["gfs_seamless", "icon_seamless"]', 'extra = ["ecmwf_ifs025"]', "nwp.base"),
+        (
+            'extra = ["gfs_seamless", "icon_seamless"]',
+            'extra = ["gfs_seamless"]\ncompare = ["gfs_seamless"]',
+            "nwp.compare",
+        ),
         ("start = 2024-01-01", "start = 2019-01-01", "nwp.start"),
         ("heavy_mm = 10.0", "heavy_mm = 0.5", "thresholds"),
         ("seeds = 3", "seeds = 0", "model settings"),

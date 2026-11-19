@@ -26,7 +26,8 @@ chirps_flavor = "sat"         # sat | rnl
 
 [nwp]
 base = "ecmwf_ifs025"
-extra = ["gfs_seamless", "icon_seamless"]  # scored raw only
+extra = ["gfs_seamless", "icon_seamless"]  # inputs to the networks and emos_multi
+compare = ["ecmwf_aifs025_single", "meteofrance_arpege_world", "jma_gsm", "gem_global"]  # scored only
 start = 2024-01-01            # archive starts Jan 2024
 chunk_days = 92
 

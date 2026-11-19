@@ -142,8 +142,8 @@ def model_fields(tru, daily, lead, rng, bias=2.0):
 def write_nwp(c, tru, daily, rng, bare=False):
     tru = tru[tru.valid >= pd.Timestamp(c.nwp.start)].reset_index(drop=True)
     daily = daily[daily.day >= pd.Timestamp(c.nwp.start)].reset_index(drop=True)
-    for model in (c.nwp.base, *c.nwp.extra):
-        groups = nwp.GROUPS if model == c.nwp.base else {"core": nwp.GROUPS["core"]}
+    for model in nwp.models(c):
+        groups = nwp.groups(c, model)
         fields = {d: model_fields(tru, daily, d, rng, bias=2.0 if model == c.nwp.base else 3.0) for d in c.lead_days}
         day = tru.valid.dt.floor("D")
         for a, b in nwp.chunks(c.nwp.start, tru.valid.iloc[-1].date(), c.nwp.chunk_days):

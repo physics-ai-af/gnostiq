@@ -4,6 +4,7 @@ import shutil
 import numpy as np
 import pandas as pd
 import pytest
+import requests
 import synth
 
 from gnostiq import live, run
@@ -92,9 +93,28 @@ def test_reports_are_converted_and_screened(trained, monkeypatch):
         return path
 
     monkeypatch.setattr(live, "fetch", fake)
-    o = live.reports(c, pd.Timestamp("2025-07-14"), pd.Timestamp("2025-07-15"))
+    o = live.metars(c, pd.Timestamp("2025-07-14"), pd.Timestamp("2025-07-15"))
     t = o[o["var"] == "t2m"].set_index("valid").obs
     td = o[o["var"] == "td2m"].set_index("valid").obs
     assert t.round(2).to_dict() == {pd.Timestamp("2025-07-14 12:00"): 25.0, pd.Timestamp("2025-07-14 14:00"): 25.0}
     assert td.round(2).to_dict() == {pd.Timestamp("2025-07-14 12:00"): 20.0}
-    assert np.isfinite(o.obs).all()
+    assert np.isfinite(o.obs).all() and set(o.source) == {"iem"}
+
+
+def test_reports_prefer_synops_and_survive_one_source_down(trained, monkeypatch):
+    t = pd.Timestamp("2025-07-14 12:00")
+    hour = pd.Timedelta(hours=1)
+    syn = pd.DataFrame({"valid": [t], "obs": [24.6], "var": ["t2m"], "source": ["nimet"]})
+    met = pd.DataFrame({"valid": [t, t + hour], "obs": [25.0, 26.0], "var": ["t2m", "t2m"], "source": ["iem", "iem"]})
+    monkeypatch.setattr(live, "synops", lambda c, a, b: syn)
+    monkeypatch.setattr(live, "metars", lambda c, a, b: met)
+    assert live.reports(trained, t, t).set_index("valid").obs.to_dict() == {t: 24.6, t + hour: 26.0}
+
+    def down(c, a, b):
+        raise requests.ConnectionError("timed out")
+
+    monkeypatch.setattr(live, "synops", down)
+    assert len(live.reports(trained, t, t)) == 2
+    monkeypatch.setattr(live, "metars", down)
+    with pytest.raises(requests.ConnectionError):
+        live.reports(trained, t, t)
