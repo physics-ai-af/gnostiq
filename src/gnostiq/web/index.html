@@ -35,7 +35,8 @@ p { margin: 4px 0; color: var(--text2); }
 .key { display: inline-block; width: 14px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 5px; }
 .key.box { height: 9px; border: 0; border-radius: 2px; }
 button, select { font: inherit; font-size: 12px; color: var(--text2); background: transparent; border: 1px solid var(--rule); border-radius: 6px; padding: 3px 8px; cursor: pointer; }
-.filters { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+.filters { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+button[aria-pressed="true"] { color: var(--text); border-color: var(--text3); font-weight: 600; }
 svg { display: block; width: 100%; height: auto; overflow: visible; }
 svg text { fill: var(--text3); font-size: 11px; font-variant-numeric: tabular-nums; }
 .grid { stroke: var(--rule); stroke-width: 1; }
@@ -73,6 +74,10 @@ a { color: inherit; }
   <h2>Last 30 days</h2>
   <p id="lmeta"></p>
   <div id="live"></div>
+
+  <h2>Track record</h2>
+  <p id="tmeta"></p>
+  <div id="track"></div>
 
   <h2 id="shead">Season check</h2>
   <p id="smeta"></p>
@@ -195,7 +200,7 @@ function lineChart(parent, o) {
     for (const w of s.whisk || []) if (w[1] != null) el("line", { x1: X(w[0]), x2: X(w[0]), y1: Y(w[1]), y2: Y(w[2]), stroke: s.color, "stroke-width": 1.5, opacity: 0.55 }, svg);
     const pts = s.pts.filter((p) => p[1] != null);
     if (!s.noLine) el("path", { d: pts.map((p, i) => (i ? "L" : "M") + X(p[0]).toFixed(1) + " " + Y(p[1]).toFixed(1)).join(""), fill: "none", stroke: s.color, "stroke-width": s.thin ? 1.25 : 2, "stroke-dasharray": s.dash || "none", "stroke-linejoin": "round" }, svg);
-    if (s.dots) for (const p of pts) el("circle", { cx: X(p[0]), cy: Y(p[1]), r: 4, fill: s.color, stroke: "var(--card)", "stroke-width": 2 }, svg);
+    if (s.dots) for (const p of pts) el("circle", { cx: X(p[0]), cy: Y(p[1]), r: s.r || 4, fill: s.color, stroke: "var(--card)", "stroke-width": s.r ? 0.5 : 2 }, svg);
   }
   const hair = el("line", { y1: m.t, y2: H - m.b, stroke: "var(--text3)", "stroke-width": 1, visibility: "hidden" }, svg);
   const xs = [...new Set(o.series.flatMap((s) => s.pts.map((p) => p[0])))].sort((a, b) => a - b);
@@ -362,15 +367,105 @@ function renderRecent(j, root, label) {
     const inRange = (v) => (v.q10 == null ? "-" : v.obs >= v.q10 && v.obs <= v.q90 ? "yes" : "no");
     table(c.tv, ["Time", "Reported", "Gnostiq", "80% range", label("raw"), "In range"], got.map((s) => { const v = s[key]; return [dfmt.format(new Date(s.valid_utc)), fx(v.obs), fx(v.q50), `${fx(v.q10)} to ${fx(v.q90)}`, fx(v.raw), inRange(v)]; }));
   }
-  if (!r.daily.length && h.some((s) => s.t2m && s.t2m.obs != null)) el("p", { class: "sub" }, root, `No day had ${r.min_hours} or more reported hours, so there are no daily highs and lows to compare.`);
+  const hrs = windowText(r.windows);
+  if (!r.daily.length && h.some((s) => s.t2m && s.t2m.obs != null)) el("p", { class: "sub" }, root, `No day had reports in the hours that hold its high or low, so there are no daily highs and lows to compare. ${hrs}`);
   if (r.daily.length) {
     const sc = el("div", { class: "card" }, root);
     el("h3", {}, sc, "Daily high and low temperature, °C");
-    el("div", { class: "sub" }, sc, `Taken over the hours that were reported, so forecast and report cover the same hours. Days with fewer than ${r.min_hours} reported hours are left out.`);
+    el("div", { class: "sub" }, sc, `${hrs} Forecast and report cover the same hours.`);
     const wrap = el("div", { class: "scroll", style: "margin-top:8px" }, sc);
     table(wrap, ["Day", "Hours", "High reported", "High Gnostiq", `High ${label("raw")}`, "Low reported", "Low Gnostiq", `Low ${label("raw")}`],
-      r.daily.map((d) => [d.day, d.reports, fx(d.obs_max), fx(d.gnostiq_max), fx(d.raw_max), fx(d.obs_min), fx(d.gnostiq_min), fx(d.raw_min)]));
+      r.daily.map((d) => [d.day, d.hours ?? d.reports, fx(d.obs_max), fx(d.gnostiq_max), fx(d.raw_max), fx(d.obs_min), fx(d.gnostiq_min), fx(d.raw_min)]));
   }
+}
+
+function windowText(w) {
+  w = w || { high: [11, 17], low: [4, 8], enough: 2 };
+  const p = (h) => String(h).padStart(2, "0") + ":00";
+  return `Highs from ${p(w.high[0])} to ${p(w.high[1])} and lows from ${p(w.low[0])} to ${p(w.low[1])} local time, over the hours reported; each needs at least ${w.enough} reported hours.`;
+}
+
+function renderTrack(live, season) {
+  const root = $("#track");
+  root.replaceChildren();
+  const site = cap(SITE.name), srcs = [];
+  if (live && live.track && live.track.rows.length) {
+    const first = live.track.rows[0].day;
+    srcs.push({ key: "live", name: `As issued, since ${first}`, t: live.track, base: live.base, links: true,
+      about: `The forecast this page showed, made up to a day before, for every day since ${first}, against ${site} station reports. Each day links to the stored record of the forecast behind it, once publishing is on.` });
+  }
+  if (season && season.track && season.track.rows.length) {
+    const [a, b] = season.window;
+    srcs.push({ key: "season", name: `Rebuilt, ${a} to ${b}`, t: season.track, base: season.base,
+      about: `What Gnostiq would have forecast a day ahead for every day from ${a} to ${b}, rebuilt from the forecast archive by networks that never saw this period, against NiMet reports. Rebuilt, not issued at the time.` });
+  }
+  if (!srcs.length) {
+    $("#tmeta").textContent = "";
+    el("div", { class: "empty" }, root, "No days scored yet. A day appears here once it has passed and its reports are in.");
+    return;
+  }
+  let cur = srcs.find((x) => x.key === "live" && x.t.rows.length >= 14) || srcs.find((x) => x.key === "season") || srcs[0];
+  const bar = srcs.length > 1 ? el("div", { class: "filters" }, root) : null;
+  const body = el("div", {}, root);
+  const draw = () => {
+    body.replaceChildren();
+    if (bar) for (const b of bar.children) b.setAttribute("aria-pressed", b.dataset.key === cur.key);
+    $("#tmeta").textContent = cur.about;
+    trackBody(body, cur);
+  };
+  if (bar) for (const x of srcs) el("button", { type: "button", "data-key": x.key }, bar, `${x.name} (${x.t.rows.length} days)`).onclick = () => { cur = x; draw(); };
+  draw();
+}
+
+function trackBody(root, x) {
+  const rows = x.t.rows, sm = x.t.summary, raw = `${MODEL[x.base] || x.base} (raw)`;
+  const pct = (v) => Math.round(v * 100) + "%";
+  const says = [["max", "Highs"], ["min", "Lows"]].filter(([k]) => sm[k].gnostiq).map(([k, name]) => {
+    const g = sm[k].gnostiq, r = sm[k].raw;
+    return `${name}: Gnostiq within 1 °C on ${pct(g.within1)} of ${g.n} days, average error ${fx(g.mae, 2)} °C` + (r ? `; ${raw} ${pct(r.within1)}, ${fx(r.mae, 2)} °C.` : ".");
+  });
+  if (sm.inside && sm.inside.n) says.push(`Reports inside Gnostiq's 80% range: ${sm.inside.k} of ${sm.inside.n} hours (${pct(sm.inside.k / sm.inside.n)}). About 80% is right.`);
+  if (says.length) { const c = el("div", { class: "card" }, root); for (const t of says) el("div", {}, c, t); }
+
+  const days = rows.map((r) => r.day), few = days.length <= 45;
+  const lab = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+  const every = Math.max(1, Math.round(days.length / 8));
+  const base = { x0: -0.5, x1: days.length - 0.5, xfmt: (i) => days[i], xticks: days.map((d, i) => [i, lab.format(new Date(d + "T12:00Z"))]).filter((_, i) => i % every === 0) };
+  const pts = (k) => rows.map((r, i) => [i, r[k] ?? null]);
+  const dot = few ? { noLine: true, dots: 1 } : { noLine: true, dots: 1, r: 2 };
+
+  const c = card(root, "Daily high and low, °C", `${windowText(x.t.windows)} Solid lines are highs, dashed lines lows, dots what was reported.`, [["Gnostiq", COLOR.gnostiq], [raw, COLOR.raw], ["Reported", "var(--text)"]]);
+  if (rows.some((r) => r.obs_max != null || r.obs_min != null)) {
+    lineChart(c.body, { ...base, label: "Daily high and low against reports", h: 270, tfmt: (p) => fx(p[1]) + " °C",
+      series: [
+        { name: "High, Gnostiq", color: COLOR.gnostiq, pts: pts("gnostiq_max") },
+        { name: "Low, Gnostiq", color: COLOR.gnostiq, dash: "5 4", pts: pts("gnostiq_min") },
+        { name: `High, ${raw}`, color: COLOR.raw, thin: 1, pts: pts("raw_max") },
+        { name: `Low, ${raw}`, color: COLOR.raw, thin: 1, dash: "5 4", pts: pts("raw_min") },
+        { name: "High, reported", color: "var(--text)", ...dot, pts: pts("obs_max") },
+        { name: "Low, reported", color: "var(--text)", ...dot, pts: pts("obs_min") },
+      ] });
+  } else el("div", { class: "empty" }, c.body, "No day yet with reports in the hours that hold its high or low.");
+  const cols = ["Day", "Hours", "High reported", "High Gnostiq", `High ${raw}`, "Low reported", "Low Gnostiq", `Low ${raw}`, "Error Gnostiq", `Error ${raw}`];
+  table(c.tv, x.links ? [...cols, "Record"] : cols, rows.map((r) => {
+    const v = [r.day, r.hours, fx(r.obs_max), fx(r.gnostiq_max), fx(r.raw_max), fx(r.obs_min), fx(r.gnostiq_min), fx(r.raw_min), fx(r.gnostiq_err, 2), fx(r.raw_err, 2)];
+    return x.links ? [...v, "-"] : v;
+  }));
+  if (x.links) c.tv.querySelectorAll("tbody tr").forEach((tr, i) => {
+    const cid = rows[i].record;
+    if (!cid) return;
+    const td = tr.lastChild;
+    td.textContent = "";
+    el("a", { href: `https://gateway.autonomys.xyz/file/${cid}`, title: cid }, td, cid.slice(0, 10) + "…");
+  });
+
+  const e = card(root, "Average error by day, °C", "Each reported hour against the forecast for that hour, averaged over the day. Lower is better.", [["Gnostiq", COLOR.gnostiq], [raw, COLOR.raw]]);
+  lineChart(e.body, { ...base, label: "Average error by day", ymin: 0, h: 200, tfmt: (p) => fx(p[1], 2) + " °C",
+    series: [
+      { name: "Gnostiq", color: COLOR.gnostiq, dots: few, pts: pts("gnostiq_err") },
+      { name: raw, color: COLOR.raw, thin: 1, dots: few, pts: pts("raw_err") },
+    ] });
+  table(e.tv, ["Day", "Gnostiq", raw], rows.map((r) => [r.day, fx(r.gnostiq_err, 2), fx(r.raw_err, 2)]));
 }
 
 function renderSeason(j) {
@@ -520,6 +615,8 @@ async function start() {
   fetch(api("records")).then((r) => (r.ok ? r.json() : null)).then((j) => j && renderRecords(j)).catch(() => {});
   load(api("live"), "#live", renderLive, `gnostiq${cfg} check`);
   load(api("season"), "#season", renderSeason, `gnostiq${cfg} season`);
+  const json = (k) => fetch(api(k)).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  Promise.all([json("live"), json("season")]).then(([l, s]) => renderTrack(l, s));
   if (borrowed()) {
     const home = sites.find((s) => s.name === SITE.trained_at), link = home ? `?site=${home.name}` : null;
     $("#filters").style.display = "none";

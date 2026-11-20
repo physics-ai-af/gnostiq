@@ -1094,7 +1094,13 @@ pdm run gnostiq check
 
 scores those saved forecasts against the station reports that came in afterwards, over the last 30 days (`--days` changes that). It keeps the first forecast issued on each UTC day so a day of 3-hourly runs counts once, and scores Gnostiq, each raw model, the height-corrected base model and the normal range on the same reports. It writes `live.json` and `live.md` beside the forecast; the page shows them under "Last 30 days".
 
-The same report also puts forecast and outcome side by side for the last 7 days, under `recent` in `live.json`: for every hour, the day-ahead forecast as shown (Gnostiq's median and 80% band, raw and height-corrected ECMWF) next to the report, how often the report fell inside the band, and each day's high and low as reported and as forecast. Highs and lows are taken over the reported hours only, so both sides cover the same hours, and only on days with at least 18 of them; a daytime-only station never gets one. On the page this is a chart per variable with the reports as dots over the band, and a table of every report.
+The same report also puts forecast and outcome side by side for the last 7 days, under `recent` in `live.json`: for every hour, the day-ahead forecast as shown (Gnostiq's median and 80% band, raw and height-corrected ECMWF) next to the report, how often the report fell inside the band, and each day's high and low as reported and as forecast. A high is taken over the reported hours from 11:00 to 17:00 local time and a low over those from 04:00 to 08:00, each needing at least two, so forecast and report cover the same hours and a daytime-only station still gets its highs. On the page this is a chart per variable with the reports as dots over the band, and a table of every report.
+
+### Track record
+
+Every check also adds to `track` in `live.json`: one row per day since the first saved forecast, with the high, the low and the day's average error, as forecast up to a day before by Gnostiq and raw ECMWF and as reported, the share of reported hours inside Gnostiq's 80% range, and the Auto Drive record of the forecast behind the day once publishing is on. Days older than the 30-day window are carried over from the previous `live.json`, so the record keeps growing; a day seen again keeps whichever version saw more reported hours. `summary` gives, for highs and lows, the average error and how often each system was within 1 C.
+
+`season.json` carries the same `track` for the rebuilt season, so there is something to read before the live record is long. The page's "Track record" section shows either, with a switch: the live record once it has two weeks, the rebuilt season until then. The two are labelled apart, since one was issued at the time and the other was rebuilt afterwards.
 
 Reports come from two places, and the first wins where both have the hour:
 
@@ -1210,6 +1216,56 @@ pdm run gnostiq season --all-sites
 ```
 
 rebuilds what each system would have issued over a whole past season from the forecast archive, lead day by lead day, and scores it against NiMet reports: Gnostiq, EMOS and multi-model EMOS fitted on the training window, the raw models, the height-corrected base model, and the normal range where the site has a station record. It refuses a season that overlaps training. It writes `season.json` and `season.md`; the page shows them under "Season check".
+
+To bring the rebuilt record up to the start of the live one, end it yesterday:
+
+#### Standard Python (`venv` / `virtualenv`)
+
+```
+gnostiq --site jos pull --only nwp,nimet
+gnostiq pull --only nwp,nimet
+gnostiq season --all-sites --start 2026-04-01
+```
+
+#### uv
+
+```
+uv run gnostiq --site jos pull --only nwp,nimet
+uv run gnostiq pull --only nwp,nimet
+uv run gnostiq season --all-sites --start 2026-04-01
+```
+
+#### Poetry
+
+```
+poetry run gnostiq --site jos pull --only nwp,nimet
+poetry run gnostiq pull --only nwp,nimet
+poetry run gnostiq season --all-sites --start 2026-04-01
+```
+
+#### Pipenv
+
+```
+pipenv run gnostiq --site jos pull --only nwp,nimet
+pipenv run gnostiq pull --only nwp,nimet
+pipenv run gnostiq season --all-sites --start 2026-04-01
+```
+
+#### Hatch
+
+```
+hatch run gnostiq --site jos pull --only nwp,nimet
+hatch run gnostiq pull --only nwp,nimet
+hatch run gnostiq season --all-sites --start 2026-04-01
+```
+
+#### PDM
+
+```
+pdm run gnostiq --site jos pull --only nwp,nimet
+pdm run gnostiq pull --only nwp,nimet
+pdm run gnostiq season --all-sites --start 2026-04-01
+```
 
 For Abuja, trained to March 2025 and tested on the 2025 wet season, the 2026 season is a second test it never saw. For Jos it is the first test of any kind: the networks and EMOS fitted at Abuja, run on Jos's own forecasts. Run `gnostiq --site jos pull --only nwp,nimet` first.
 
@@ -1604,7 +1660,16 @@ Setting it up, once:
 
 From then on, publish only from the workflow: leave `AUTO_DRIVE_API_KEY` unset on your machine, and never re-run the seed with `--force` after anything has been published, because the workflow's copy holds the record chain.
 
-To ship networks retrained on your machine, change only `models/` on the branch:
+To put a season check run on your machine on the page, add its report to the branch:
+
+```
+uv run gnostiq season --all-sites --start 2026-04-01
+uv run python scripts/seed_state.py --update reports/season.json reports/season.md
+```
+
+`--update` adds the named files on top of the branch the workflow keeps, rather than replacing it, and refuses anything outside what the workflow keeps. A run already under way when you push replaces the branch with its own copy; the script says to run it again in that case, and nothing else is lost. The page shows the new season after the next run.
+
+To ship networks retrained on your machine, `--update models` does the same for the networks. By hand, change only `models/` on the branch:
 
 ```
 git fetch origin state

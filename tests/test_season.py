@@ -37,6 +37,14 @@ def test_every_system_is_scored_on_the_same_reports(trained, reports):
     # the synthetic model is 2 C warm; the corrections must beat it
     assert t["systems"]["gnostiq"]["crps"] < t["systems"]["raw"]["crps"]
     assert (c.paths.reports / "season.md").read_text().startswith(f"# Season: {c.site.name}, {START}")
+    # day by day: a daytime-only station gives highs and no lows
+    tr = out["track"]
+    assert len(tr["rows"]) > 80 and all(r["obs_min"] is None for r in tr["rows"])
+    sm = tr["summary"]
+    assert sm["max"]["days"] == sum(r["obs_max"] is not None for r in tr["rows"]) > 80 and sm["min"]["days"] == 0
+    assert sm["max"]["gnostiq"]["mae"] < sm["max"]["raw"]["mae"]
+    assert sm["inside"]["n"] == sum(r["hours"] for r in tr["rows"])
+    assert "## Track record" in (c.paths.reports / "season.md").read_text()
 
 
 def test_a_season_inside_training_is_refused(trained):

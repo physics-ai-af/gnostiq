@@ -15,7 +15,12 @@ log = logging.getLogger("gnostiq")
 
 DAYS = 30
 RECENT = 7
-FULL_DAY = 18  # reported hours before a day's high and low mean anything
+# local hours that hold the day's high and its low; NiMet reports some days only by day, so a
+# high or low needs this many reported hours in its window rather than a full day of reports
+HIGH = (11, 17)
+LOW = (4, 8)
+ENOUGH = 2
+WINDOWS = {"high": list(HIGH), "low": list(LOW), "enough": ENOUGH}
 OBS = {"t2m": "t", "td2m": "td"}
 HOUR = 3600
 
@@ -116,6 +121,82 @@ def summarize(j, key, core, refs, rng):
     return out, j
 
 
+def val(x, nd=1):
+    return None if pd.isna(x) else round(float(x), nd)
+
+
+def by_day(w, tz):
+    # one row per local day: high, low and average error over the reported hours, so every
+    # system is judged on the same hours as the report
+    t = w[w["var"] == "t2m"].dropna(subset=["obs", "gnostiq"])
+    if t.empty:
+        return []
+    local = t.valid.dt.tz_localize("UTC").dt.tz_convert(tz)
+    t = t.assign(day=local.dt.strftime("%Y-%m-%d"), hour=local.dt.hour)
+    band = "q10" in t and "q90" in t
+    rows = []
+    for d, h in t.groupby("day"):
+        row = {"day": d, "hours": len(h)}
+        for name, (lo, hi), pick in (("max", HIGH, "max"), ("min", LOW, "min")):
+            x = h[h.hour.between(lo, hi)]
+            for col in ("obs", "gnostiq", "raw"):
+                row[f"{col}_{name}"] = val(getattr(x[col], pick)()) if len(x) >= ENOUGH and col in x else None
+        for col in ("gnostiq", "raw"):
+            row[f"{col}_err"] = val((h[col] - h.obs).abs().mean(), 2) if col in h else None
+        if band:
+            b = h.dropna(subset=["q10", "q90"])
+            row["in_n"], row["in_k"] = len(b), int(((b.obs >= b.q10) & (b.obs <= b.q90)).sum())
+        rows.append(row)
+    return rows
+
+
+def tally(rows):
+    out = {"days": len(rows)}
+    for k in ("max", "min"):
+        x = [r for r in rows if r[f"obs_{k}"] is not None]
+        out[k] = {"days": len(x)}
+        for s in ("gnostiq", "raw"):
+            e = [abs(r[f"{s}_{k}"] - r[f"obs_{k}"]) for r in x if r[f"{s}_{k}"] is not None]
+            if e:
+                # values are rounded to 0.1, so allow for it at the 1 degree line
+                out[k][s] = {"n": len(e), "mae": round(sum(e) / len(e), 2),
+                             "within1": round(sum(v <= 1.0001 for v in e) / len(e), 3)}  # fmt: skip
+    out["inside"] = {"n": sum(r.get("in_n", 0) for r in rows), "k": sum(r.get("in_k", 0) for r in rows)}
+    return out
+
+
+def merge_days(old, new):
+    # a day seen again keeps whichever version saw more reported hours
+    rows = {r["day"]: r for r in old}
+    for r in new:
+        if r["day"] not in rows or r["hours"] >= rows[r["day"]]["hours"]:
+            rows[r["day"]] = r
+    return [rows[d] for d in sorted(rows)]
+
+
+def track(c, a, rep, old):
+    # every day the page has forecast, the forecast made up to a day before, with the public record behind it
+    a = a[(a.lead_day == 1) & a.system.isin(["gnostiq", "raw"])]
+    a = a.sort_values("init").drop_duplicates(["valid", "var", "system"], keep="last")
+    w = a.pivot_table(index=["valid", "var"], columns="system", values="mu")
+    g = a[a.system == "gnostiq"].set_index(["valid", "var"])
+    w = w.join(g[[k for k in ("q10", "q90", "init") if k in g]], how="left")
+    w = w.join(rep.set_index(["valid", "var"]).obs, how="left").reset_index()
+    rows = by_day(w, c.site.tz)
+    path = c.paths.reports / "records.json"
+    cids = {r["day"]: r["record_cid"] for r in json.loads(path.read_text()).get("records", [])} if path.exists() else {}
+    if "init" in w:
+        t = w[w["var"] == "t2m"].dropna(subset=["obs", "gnostiq"])
+        day = t.valid.dt.tz_localize("UTC").dt.tz_convert(c.site.tz).dt.strftime("%Y-%m-%d")
+        made = t.groupby(day).init.agg(lambda s: s.mode().iloc[0])
+        for r in rows:
+            init = made.get(r["day"])
+            r["issued_utc"] = None if init is None else f"{init:%Y-%m-%dT%H:%MZ}"
+            r["record"] = None if init is None else cids.get(f"{init:%Y-%m-%d}")
+    rows = merge_days(old, rows)
+    return {"tz": c.site.tz, "windows": WINDOWS, "rows": rows, "summary": tally(rows)}
+
+
 def recent(c, a, rep, until, days=RECENT):
     # the day-ahead forecast as the page showed it, hour by hour, next to what was reported
     a = a[(a.lead_day == 1) & (a.valid > until - pd.Timedelta(days=days)) & a.system.isin(["gnostiq", "raw", "lapse"])]
@@ -131,9 +212,6 @@ def recent(c, a, rep, until, days=RECENT):
     w = g.join(a[a.system != "gnostiq"].pivot_table(index=["valid", "var"], columns="system", values="mu"), how="outer")
     w = w.join(rep.set_index(["valid", "var"]).obs, how="left").reset_index()
 
-    def val(x):
-        return None if pd.isna(x) else round(float(x), 1)
-
     hourly = []
     for v, h in w.groupby("valid"):
         row = {"valid_utc": f"{v:%Y-%m-%dT%H:%MZ}"}
@@ -145,21 +223,21 @@ def recent(c, a, rep, until, days=RECENT):
     for var, h in w.dropna(subset=["obs", "q10", "q90"]).groupby("var"):
         inside[var] = {"n": len(h), "k": int(((h.obs >= h.q10) & (h.obs <= h.q90)).sum())}
 
-    # highs and lows over the hours that were reported, so forecast and report cover the same hours
-    t = w[(w["var"] == "t2m")].dropna(subset=["obs", "q50"])
-    t = t.assign(day=t.valid.dt.tz_localize("UTC").dt.tz_convert(c.site.tz).dt.strftime("%Y-%m-%d"))
-    daily = []
-    for d, h in t.groupby("day"):
-        if len(h) < FULL_DAY:
-            continue
-        row = {"day": d, "reports": len(h)}
-        for col, name in (("obs", "obs"), ("q50", "gnostiq"), ("raw", "raw")):
-            row[f"{name}_max"], row[f"{name}_min"] = val(h[col].max()), val(h[col].min())
-        daily.append(row)
-    return {"days": days, "tz": c.site.tz, "hourly": hourly, "inside": inside, "daily": daily, "min_hours": FULL_DAY}
+    days_ = by_day(w.rename(columns={"q50": "gnostiq"}), c.site.tz)
+    daily = [d for d in days_ if d["obs_max"] is not None or d["obs_min"] is not None]
+    return {"days": days, "tz": c.site.tz, "hourly": hourly, "inside": inside, "daily": daily, "windows": WINDOWS}
+
+
+def earlier(c):
+    path = c.paths.reports / "live.json"
+    try:
+        return json.loads(path.read_text()).get("track", {}).get("rows", [])
+    except (OSError, ValueError, AttributeError):
+        return []
 
 
 def run(c, days=DAYS):
+    old = earlier(c)
     a = archive(c)
     until = pd.Timestamp.now("UTC").tz_localize(None).floor("h")
     since = until - pd.Timedelta(days=days)
@@ -177,7 +255,8 @@ def run(c, days=DAYS):
 
     out = {"site": c.site.name, "base": c.nwp.base, "since": f"{since:%Y-%m-%d}", "until": f"{until:%Y-%m-%dT%H:%MZ}",
            "issues": int(a.init.nunique()), "reports": int(rep.valid.nunique()),
-           "sources": sources(rep), "vars": out_vars, "recent": recent(c, a, rep, until)}  # fmt: skip
+           "sources": sources(rep), "vars": out_vars, "recent": recent(c, a, rep, until),
+           "track": track(c, a, rep, old)}  # fmt: skip
     c.paths.reports.mkdir(parents=True, exist_ok=True)
     (c.paths.reports / "live.json").write_text(json.dumps(out, indent=1))
     (c.paths.reports / "live.md").write_text(markdown(out))
@@ -208,6 +287,7 @@ def markdown(doc):
         for ref, sk in v["skill"].items():
             out.append(f"CRPSS vs {ref}: {verify.skill_cell(sk)}")
         out.append("")
+    out += track_md(doc.get("track"), "day-ahead forecast as the page showed it")
     r = doc.get("recent") or {}
     if r.get("inside"):
         out += [f"## Last {r['days']} days, day-ahead forecast against reports", ""]
@@ -215,9 +295,29 @@ def markdown(doc):
             out.append(f"- {var}: report inside Gnostiq's 80% range {x['k']} of {x['n']} times (expect about 80%)")
         if r["daily"]:
             out += ["", f"Highs and lows over the reported hours ({r['tz']} days):", "",
-                    "| day | reports | reported | Gnostiq | raw |", "|---|---|---|---|---|"]  # fmt: skip
+                    "| day | hours | reported | Gnostiq | raw |", "|---|---|---|---|---|"]  # fmt: skip
             for d in r["daily"]:
                 cells = [f"{d[f'{k}_max']} / {d[f'{k}_min']}" for k in ("obs", "gnostiq", "raw")]
-                out.append(f"| {d['day']} | {d['reports']} | " + " | ".join(cells) + " |")
+                out.append(f"| {d['day']} | {d['hours']} | " + " | ".join(cells) + " |")
         out.append("")
     return "\n".join(out)
+
+
+def track_md(t, what):
+    if not t or not t["rows"]:
+        return []
+    s, w = t["summary"], t["windows"]
+    hi, lo = w["high"], w["low"]
+    out = [f"## Track record: {s['days']} days, {what}", "",
+           f"High from {hi[0]:02d}:00 to {hi[1]:02d}:00 and low from {lo[0]:02d}:00 to {lo[1]:02d}:00 local time, "
+           f"over the hours reported (at least {w['enough']} in each).", ""]  # fmt: skip
+    for k, name in (("max", "High"), ("min", "Low")):
+        x = s[k]
+        for sys in ("gnostiq", "raw"):
+            if sys in x:
+                out.append(f"- {name}, {sys}: average error {x[sys]['mae']:.2f} C, within 1 C on "
+                           f"{x[sys]['within1']:.0%} of {x[sys]['n']} days")  # fmt: skip
+    if s["inside"]["n"]:
+        i = s["inside"]
+        out.append(f"- Reports inside Gnostiq's 80% range: {i['k']} of {i['n']} hours ({i['k'] / i['n']:.0%})")
+    return [*out, ""]
