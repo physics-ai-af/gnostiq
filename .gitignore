@@ -1,0 +1,10 @@
+/data/
+.venv/
+venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+*.part
+.ruff_cache/
+.pdm-python

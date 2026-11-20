@@ -90,7 +90,7 @@ a { color: inherit; }
 
   <footer>
     Forecast input: Open-Meteo (CC BY 4.0), ECMWF open data. Observations: NOAA GHCNh, Iowa Environmental Mesonet, Nigerian Meteorological Agency (WIS2). Rainfall: CHIRPS v3, Climate Hazards Center; TAMSAT v3.1, University of Reading. Public record: Autonomys Auto Drive.
-    <a href="/method">Method note</a>.
+    <a href="method">Method note</a>.
   </footer>
 </main>
 <div id="tip"></div>
@@ -507,14 +507,15 @@ if (["t2m", "td2m", "tp24"].includes(hv)) $("#var").value = hv;
 $("#var").onchange = () => { history.replaceState(null, "", location.search + "#" + $("#var").value); renderVerify(); };
 
 async function start() {
-  const r = await fetch("/api/sites");
+  // relative, so the same page works behind the API and as static files under a path
+  const r = await fetch("api/sites");
   const sites = r.ok ? await r.json() : [];
   if (!sites.length) return;
   const want = new URLSearchParams(location.search).get("site");
   SITE = sites.find((s) => s.name === want) || sites[0];
   renderSites(sites);
   setSite(SITE);
-  const api = (kind) => `/api/${SITE.name}/${kind}`, cfg = SITE === sites[0] ? "" : ` --site ${SITE.name}`;
+  const api = (kind) => `api/${SITE.name}/${kind}`, cfg = SITE === sites[0] ? "" : ` --site ${SITE.name}`;
   load(api("forecast"), "#forecast", renderForecast, `gnostiq${cfg} run`);
   fetch(api("records")).then((r) => (r.ok ? r.json() : null)).then((j) => j && renderRecords(j)).catch(() => {});
   load(api("live"), "#live", renderLive, `gnostiq${cfg} check`);

@@ -47,7 +47,9 @@ def test_page_is_served_and_talks_to_the_api(site):
     _, client = site
     r = client.get("/")
     assert r.status_code == 200 and r.headers["content-type"].startswith("text/html")
-    assert "/api/sites" in r.text and "/api/${SITE.name}/${kind}" in r.text and "forecast and what happened" in r.text
+    # relative, so the page also works as static files under a path
+    assert 'fetch("api/sites")' in r.text and "`api/${SITE.name}/${kind}`" in r.text and 'href="method"' in r.text
+    assert "forecast and what happened" in r.text
     for kind in ("forecast", "verify", "cases", "live", "season"):
         assert f'api("{kind}")' in r.text
     assert "Open-Meteo" in r.text and "CHIRPS" in r.text
@@ -86,3 +88,22 @@ def test_every_site_beside_the_config_is_served(tmp_path):
     assert r.status_code == 404 and "not generated yet for nearby" in r.json()["detail"]
     assert client.get("/api/elsewhere/forecast").status_code == 404
     assert client.get("/api/jos/secrets").status_code == 404
+
+
+def test_export_lays_the_reports_out_like_the_api(tmp_path):
+    c = cfg.load(write_cfg(tmp_path))
+    near = add_nearby(tmp_path)
+    for x in (c, near):
+        x.paths.ensure()
+        (x.paths.reports / "forecast.json").write_text(json.dumps({"init_utc": x.site.name, "hourly": []}))
+    (c.paths.reports / "records.json").write_text(json.dumps({"records": []}))
+    (c.source.parent / "docs").mkdir()
+    (c.source.parent / "docs" / "METHOD.md").write_text("# Method <note>\n")
+    out = tmp_path / "site"
+    assert api.export(c, out) == 3
+    client = TestClient(api.create(c))
+    for url in ("/api/sites", "/api/jos/forecast", "/api/nearby/forecast", "/api/jos/records"):
+        assert json.loads((out / url.lstrip("/")).read_text()) == client.get(url).json()
+    assert not (out / "api" / "nearby" / "records").exists()
+    assert (out / "index.html").read_bytes() == client.get("/").content and (out / ".nojekyll").exists()
+    assert "# Method &lt;note&gt;" in (out / "method" / "index.html").read_text(encoding="utf-8")

@@ -1,6 +1,8 @@
 """Read-only API over the report files."""
 
+import html
 import json
+import shutil
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -17,6 +19,43 @@ REPORTS = {
     "season": "season.json",
     "records": "records.json",
 }
+
+
+def listing(sites):
+    return [{"name": n, "trained_at": x.donor or n, "lat": x.site.lat, "lon": x.site.lon,
+             "elev_m": x.site.elev, "compare": list(x.nwp.compare)} for n, x in sites.items()]  # fmt: skip
+
+
+def method_note(c):
+    path = c.source.parent / "docs" / "METHOD.md"
+    return path.read_text(encoding="utf-8") if path.exists() else None
+
+
+def export(c, out):
+    # the same page and reports as plain files, laid out like the API, for a static host
+    out = Path(out)
+    sites = {x.site.name: x for x in cfg.sites(c)}
+    (out / "api").mkdir(parents=True, exist_ok=True)
+    shutil.copy(WEB / "index.html", out / "index.html")
+    (out / ".nojekyll").write_text("")
+    (out / "api" / "sites").write_text(json.dumps(listing(sites)))
+    n = 0
+    for name, x in sites.items():
+        (out / "api" / name).mkdir(exist_ok=True)
+        for kind, file in REPORTS.items():
+            if (x.paths.reports / file).exists():
+                shutil.copy(x.paths.reports / file, out / "api" / name / kind)
+                n += 1
+    note = method_note(c)
+    if note is not None:
+        (out / "method").mkdir(exist_ok=True)
+        (out / "method" / "index.html").write_text(
+            '<!DOCTYPE html><meta charset="utf-8"><title>Gnostiq method note</title>'
+            '<pre style="white-space:pre-wrap;max-width:80ch;margin:2em auto;font:15px/1.5 system-ui,sans-serif">'
+            f"{html.escape(note)}</pre>\n",
+            encoding="utf-8",
+        )
+    return n
 
 
 def create(c=None):
@@ -38,9 +77,8 @@ def create(c=None):
         return json.loads(f.read_text())["init_utc"] if f.exists() else None
 
     @app.get("/api/sites")
-    def listing():
-        return [{"name": n, "trained_at": x.donor or n, "lat": x.site.lat, "lon": x.site.lon,
-                 "elev_m": x.site.elev, "compare": list(x.nwp.compare)} for n, x in sites.items()]  # fmt: skip
+    def site_list():
+        return listing(sites)
 
     @app.get("/api/{site}/{kind}")
     def per_site(site: str, kind: str):
@@ -69,10 +107,10 @@ def create(c=None):
 
     @app.get("/method", response_class=PlainTextResponse)
     def method():
-        path = c.source.parent / "docs" / "METHOD.md"
-        if not path.exists():
+        note = method_note(c)
+        if note is None:
             raise HTTPException(404, "method note not found")
-        return path.read_text()
+        return note
 
     @app.get("/")
     def index():
