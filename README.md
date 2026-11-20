@@ -13,44 +13,44 @@ Use the block for your tool.
 ### Standard Python (`venv` / `virtualenv`)
 
 ```
-pytest                         # everything
-python -m pytest               # everything, explicit interpreter
-pytest tests/test_pipeline.py  # one file
+pytest                           # everything
+python -m pytest                 # everything, explicit interpreter
+pytest tests/test_seed_state.py  # one file
 ```
 
 ### uv
 
 ```
-uv run pytest                         # everything
-uv run pytest tests/test_pipeline.py  # one file
+uv run pytest                           # everything
+uv run pytest tests/test_seed_state.py  # one file
 ```
 
 ### Poetry
 
 ```
-poetry run pytest                         # everything
-poetry run pytest tests/test_pipeline.py  # one file
+poetry run pytest                           # everything
+poetry run pytest tests/test_seed_state.py  # one file
 ```
 
 ### Pipenv
 
 ```
-pipenv run pytest                         # everything
-pipenv run pytest tests/test_pipeline.py  # one file
+pipenv run pytest                           # everything
+pipenv run pytest tests/test_seed_state.py  # one file
 ```
 
 ### Hatch
 
 ```
-hatch run pytest                         # everything
-hatch run pytest tests/test_pipeline.py  # one file
+hatch run pytest                           # everything
+hatch run pytest tests/test_seed_state.py  # one file
 ```
 
 ### PDM
 
 ```
-pdm run pytest                         # everything
-pdm run pytest tests/test_pipeline.py  # one file
+pdm run pytest                           # everything
+pdm run pytest tests/test_seed_state.py  # one file
 ```
 
 No test touches the network. Downloads are replaced with stand-ins, and anything that needs data uses synthetic files written in the real formats.
@@ -87,8 +87,9 @@ No test touches the network. Downloads are replaced with stand-ins, and anything
 | `tests/data/nimet_65134_excerpt.json` | One real Jos synop from NiMet's node, as served |
 | `tests/test_season.py` | Every system on the same reports, no overlap with training, the default season, a borrowing site |
 | `tests/test_publish.py` | First issue per day, the chain of records, repeat runs, tampering caught, dry run, verify without a config |
-| `tests/test_api.py` | 404 before reports exist, reports served as written, every site beside the config, the page, the method note |
+| `tests/test_api.py` | 404 before reports exist, reports served as written, every site beside the config, the page, the method note, the static export |
 | `tests/test_pipeline.py` | The whole pipeline through the CLI, then the live run for both sites and the API |
+| `tests/test_seed_state.py` | What goes on the state branch, what later runs keep out, sites outside data/, the workflow's commands |
 
 ## Setup
 
@@ -1583,6 +1584,49 @@ The run unit publishes after every forecast; without the file it does a dry run.
 
 CI is in `.github/workflows/ci.yml`: lint and tests on every push and pull request. It installs without a lock file, so commit `uv.lock` and change the step to `uv sync --locked` once the stack is merged.
 
+## Free hosting on GitHub
+
+For when there is no server to pay for. The scheduled workflow `.github/workflows/live.yml` does the systemd timers' job: every three hours it makes a forecast for every site, publishes each day's first one to Auto Drive, scores past forecasts, and puts the page on GitHub Pages. It costs nothing for a public repository and needs no card.
+
+The workflow's working files live on a branch called `state`: the trained networks, the reports, the terrain heights, the station record, the forecast archive and the list of published records. Each run checks the branch out as `data/`, works in it, and replaces it with a single new commit, so old forecasts never pile up in history.
+
+Setting it up, once:
+
+1. Train on your machine (Running it for real above), then commit and push the code.
+2. Put the trained files on the `state` branch:
+   ```
+   uv run python scripts/seed_state.py
+   ```
+   It copies only what the workflow needs (`KEEP` in the script) and refuses to replace a `state` branch that already exists.
+3. In the repository settings, under Pages, set Source to "GitHub Actions".
+4. Under Settings, Secrets and variables, Actions, add `AUTO_DRIVE_API_KEY`. Without it, publishing is a dry run.
+5. Under Actions, pick "live" and press "Run workflow". The page appears at `https://<user>.github.io/<repo>/`.
+
+From then on, publish only from the workflow: leave `AUTO_DRIVE_API_KEY` unset on your machine, and never re-run the seed with `--force` after anything has been published, because the workflow's copy holds the record chain.
+
+To ship networks retrained on your machine, change only `models/` on the branch:
+
+```
+git fetch origin state
+git worktree add ../gnostiq-state origin/state
+cp -r data/abuja/models ../gnostiq-state/abuja/
+git -C ../gnostiq-state add -A
+git -C ../gnostiq-state commit -m "state: retrained networks"
+git -C ../gnostiq-state push origin HEAD:state
+git worktree remove ../gnostiq-state
+```
+
+If the push is refused, a run replaced the branch in the meantime; remove the worktree and start again.
+
+Things to know:
+
+- Scheduled runs can start half an hour or more late when GitHub is busy. That is why the schedule is at 23 minutes past, not on the hour.
+- GitHub switches off schedules in a public repository with no activity for 60 days. The workflow's own pushes should count as activity; if the Actions tab says "live" is disabled, enable it there.
+- The page is static. It changes when a run finishes, not when someone visits; `serve` is not used.
+- Every run's log is public and timestamped by GitHub, so each Auto Drive upload can be checked against a clock that is not yours.
+- The trained networks and the archive are public on the `state` branch.
+- `gnostiq export <dir>` writes the same page and reports as plain files, for any static host.
+
 ## Keeping it current
 
 - The forecast refreshes itself through the timer.
@@ -1607,6 +1651,7 @@ The pipeline has run end to end on real data for Abuja, with the 2025 wet season
 | NiMet WIS2 node | Yes | Works from a cloud browser; timed out from one home connection |
 | TAMSAT v3.1 | Partly | File names and sizes seen in the archive index; no file read yet |
 | Auto Drive S3 upload and gateway | No | Built from Autonomys's documentation; not yet run with a key |
+| GitHub Actions workflow and Pages | No | Not yet run on GitHub; the export and seed script are tested |
 
 ## Assumptions to check on real data
 

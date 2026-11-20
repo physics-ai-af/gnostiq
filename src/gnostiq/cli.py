@@ -142,6 +142,13 @@ def serve(c, a):
     uvicorn.run(api.create(c), host=a.host, port=a.port, log_level="info")
 
 
+def export(c, a):
+    from gnostiq import api
+
+    n = api.export(c, a.out)
+    log.info("export: the page and %d reports in %s", n, a.out)
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="gnostiq")
     p.add_argument("--config", help=f"config file (default: {cfg.FILENAME} found upward, or $GNOSTIQ_CFG)")
@@ -181,6 +188,8 @@ def main(argv=None):
     s = add("serve", serve, "serve the API and web page")
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--port", type=int, default=8000)
+    s = add("export", export, "write the page and every site's reports as static files")
+    s.add_argument("out", help="directory to write to")
 
     a = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")

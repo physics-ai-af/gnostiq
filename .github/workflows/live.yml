@@ -1,0 +1,63 @@
+name: live
+
+# Free hosting: a forecast for every site every three hours, the working files kept on
+# the state branch, the page served by GitHub Pages. See "Free hosting on GitHub" in the README.
+
+on:
+  schedule:
+    - cron: "23 */3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: live
+  cancel-in-progress: false
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6
+        with:
+          ref: state
+          path: data
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          enable-cache: true
+      - run: uv sync --no-dev
+
+      - name: Forecast, publish, check
+        env:
+          AUTO_DRIVE_API_KEY: ${{ secrets.AUTO_DRIVE_API_KEY }}
+          GNOSTIQ_COMMIT: ${{ github.sha }}
+        run: |
+          .venv/bin/gnostiq run --all-sites || echo "::warning::run failed for a site; its last forecast stays up"
+          .venv/bin/gnostiq publish --all-sites || echo "::warning::publish failed; missed days are caught up next run"
+          .venv/bin/gnostiq check --all-sites || echo "::warning::check failed for a site; its last scores stay up"
+
+      - name: Save state
+        working-directory: data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # one commit, replaced every run, so old forecasts never pile up in history
+          git checkout -q --orphan next
+          git add -A
+          git commit -qm "state $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -fq origin next:state
+
+      - run: .venv/bin/gnostiq export "$RUNNER_TEMP/site"
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: ${{ runner.temp }}/site
+      - id: pages
+        uses: actions/deploy-pages@v5
