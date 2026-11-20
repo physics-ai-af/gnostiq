@@ -64,6 +64,34 @@ def test_the_branch_ignore_keeps_later_runs_to_the_same_files(tmp_path):
         assert subprocess.run(["git", "check-ignore", "-q", f], cwd=out).returncode == 1, f
 
 
+@pytest.mark.skipif(not shutil.which("git"), reason="needs git")
+def test_update_adds_to_the_branch_without_replacing_it(tmp_path, monkeypatch):
+    for k in ("AUTHOR", "COMMITTER"):
+        monkeypatch.setenv(f"GIT_{k}_NAME", "t")
+        monkeypatch.setenv(f"GIT_{k}_EMAIL", "t@example.com")
+    c = two_sites(tmp_path)
+    remote = tmp_path / "remote.git"
+    for args, where in ((["init", "-q", "--bare", str(remote)], tmp_path), (["init", "-q"], tmp_path),
+                        (["remote", "add", "origin", str(remote)], tmp_path)):  # fmt: skip
+        subprocess.run(["git", *args], cwd=where, check=True)
+    cfg_arg = ["--config", str(c.source)]
+    seed.main(cfg_arg)
+    with pytest.raises(SystemExit, match="already exists"):
+        seed.main(cfg_arg)
+    (c.paths.reports / "season.json").write_text('{"window": 1}')
+    seed.main([*cfg_arg, "--update", "reports/season.json"])
+
+    def at_remote(*args):
+        return subprocess.run(["git", *args], cwd=remote, check=True, capture_output=True, text=True).stdout
+
+    assert at_remote("log", "--format=%s", "state").split("\n")[:2] == ["state: update reports/season.json",
+                                                                          "state: seed from data/"]  # fmt: skip
+    assert "jos/models/hourly.pt" in at_remote("ls-tree", "-r", "--name-only", "state")
+    assert at_remote("show", "state:jos/reports/season.json") == '{"window": 1}'
+    with pytest.raises(SystemExit, match="not kept on state"):
+        seed.main([*cfg_arg, "--update", "raw/big.grib"])
+
+
 def test_a_site_outside_data_is_refused(tmp_path):
     c = cfg.load(write_cfg(tmp_path))
     add_nearby(tmp_path)

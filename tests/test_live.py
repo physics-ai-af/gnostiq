@@ -82,10 +82,60 @@ def test_the_last_week_puts_forecast_and_report_side_by_side(trained, monkeypatc
     assert by[o.valid]["obs"] is None and by[o.valid]["q10"] == pytest.approx(o.mu - dist.Z80 * o.sigma, abs=0.06)
     inside = ((rep.obs >= g.q10) & (rep.obs <= g.q90)).sum()
     assert r["inside"]["t2m"] == {"n": 24, "k": int(inside)}
+    # the next local day's four hours hold neither its high nor its low, so it is left out
     day = r["daily"]
-    assert [d["day"] for d in day] == [f"{inits[1]:%Y-%m-%d}"] and day[0]["reports"] == 20
-    assert day[0]["obs_max"] == round(rep.obs.iloc[:20].max(), 1)
+    assert [d["day"] for d in day] == [f"{inits[1]:%Y-%m-%d}"] and day[0]["hours"] == 20
+    local = rep.valid.dt.tz_localize("UTC").dt.tz_convert(c.site.tz)
+    first = local.dt.strftime("%Y-%m-%d") == f"{inits[1]:%Y-%m-%d}"
+    assert day[0]["obs_max"] == round(rep.obs[first & local.dt.hour.between(*live.HIGH)].max(), 1)
+    assert day[0]["obs_min"] == round(rep.obs[first & local.dt.hour.between(*live.LOW)].min(), 1)
     assert "Last 7 days" in (c.paths.reports / "live.md").read_text()
+
+
+def blank(day, hours):
+    keys = [f"{s}_{k}" for s in ("obs", "gnostiq", "raw") for k in ("max", "min")] + ["gnostiq_err", "raw_err"]
+    return {"day": day, "hours": hours, **dict.fromkeys(keys)}
+
+
+def test_the_track_record_keeps_every_day_and_links_its_record(trained, monkeypatch):
+    c = trained
+    shutil.rmtree(c.paths.archive, ignore_errors=True)
+    today = pd.Timestamp.now("UTC").tz_localize(None).floor("D")
+    inits = [today - pd.Timedelta(days=d, hours=-2) for d in (3, 2)]
+    made = [issue(c, i) for i in inits]
+    raw = pd.concat([t[(t.system == "raw") & (t.lead_day == 1)] for t in made])
+    rep = raw.assign(obs=raw.mu + 1.0)[["valid", "var", "obs"]]
+    monkeypatch.setattr(live, "reports", lambda c, since, until: rep)
+    # a day from long before this check's window, and a thin earlier copy of a day seen again
+    old_day, again = "2026-01-05", f"{inits[0]:%Y-%m-%d}"
+    c.paths.reports.mkdir(parents=True, exist_ok=True)
+    (c.paths.reports / "live.json").write_text(json.dumps({"track": {"rows": [blank(old_day, 12), blank(again, 1)]}}))
+    recs = [{"day": f"{inits[1]:%Y-%m-%d}", "record_cid": "bafkrec1"}]
+    (c.paths.reports / "records.json").write_text(json.dumps({"records": recs}))
+
+    t = live.run(c)["track"]
+    days = [r["day"] for r in t["rows"]]
+    assert days[0] == old_day and days == sorted(set(days))
+    by = {r["day"]: r for r in t["rows"]}
+    assert by[again]["hours"] == 20 and by[again]["record"] is None
+    assert by[f"{inits[1]:%Y-%m-%d}"]["record"] == "bafkrec1"
+    assert by[f"{inits[1]:%Y-%m-%d}"]["issued_utc"] == f"{inits[1]:%Y-%m-%dT%H:%MZ}"
+    full = [r for r in t["rows"] if r["hours"] >= 20]
+    assert full and all(r["raw_err"] == 1.0 for r in full)
+    s = t["summary"]
+    assert s["days"] == len(days) and s["max"]["raw"]["mae"] == pytest.approx(1.0, abs=0.11)
+    assert s["inside"]["n"] == sum(r.get("in_n", 0) for r in t["rows"]) > 0
+    assert "## Track record" in (c.paths.reports / "live.md").read_text()
+    # the next check keeps all of it
+    assert [r["day"] for r in live.run(c)["track"]["rows"]] == days
+
+
+def test_a_daytime_only_day_has_a_high_and_no_low():
+    valid = pd.date_range("2026-03-02 08:00", "2026-03-02 17:00", freq="h")
+    w = pd.DataFrame({"valid": valid, "var": "t2m", "obs": range(10), "gnostiq": range(10), "raw": range(10)})
+    (r,) = live.by_day(w, "Africa/Lagos")
+    # 08 to 17 UTC is 09 to 18 local; the 18:00 reading is past the high's window
+    assert r["hours"] == 10 and r["obs_max"] == 8 and r["obs_min"] is None and r["gnostiq_err"] == 0
 
 
 def test_check_with_no_reports_at_all_says_so(issued, monkeypatch):

@@ -6,7 +6,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-from gnostiq import align, baselines, live, model, physics, verify
+from gnostiq import align, baselines, dist, live, model, physics, verify
 from gnostiq.ingest import nimet, nwp
 
 log = logging.getLogger("gnostiq")
@@ -66,6 +66,17 @@ def issued(c, start, end):
     return pd.concat(rows, ignore_index=True).dropna(subset=["mu"])
 
 
+def track(c, pred, rep):
+    # day by day, the forecast each day would have had a day ahead, beside what NiMet reported
+    p = pred[(pred.lead_day == 1) & pred.system.isin(["gnostiq", "raw"])]
+    w = p.pivot_table(index=["valid", "var"], columns="system", values="mu")
+    sig = p[p.system == "gnostiq"].set_index(["valid", "var"]).sigma
+    w = w.assign(q10=w.gnostiq - dist.Z80 * sig, q90=w.gnostiq + dist.Z80 * sig)
+    w = w.join(rep.set_index(["valid", "var"]).obs, how="left").reset_index()
+    rows = live.by_day(w, c.site.tz)
+    return {"tz": c.site.tz, "windows": live.WINDOWS, "rows": rows, "summary": live.tally(rows)}
+
+
 def stats(g):
     return {"n": len(g), "mae": round(float(g.err.mean()), 3), "crps": round(float(g.crps.mean()), 3)}
 
@@ -99,6 +110,7 @@ def run(c, start=None, end=None):
         # a daytime-only station leaves the night unscored
         "hours": {int(k): int(n) for k, n in used.dt.hour.value_counts().sort_index().items()},
         "vars": out_vars,
+        "track": track(c, pred, rep),
     }
     c.paths.reports.mkdir(parents=True, exist_ok=True)
     (c.paths.reports / "season.json").write_text(json.dumps(out, indent=1))
@@ -141,4 +153,5 @@ def markdown(doc):
                 cells = [f"{v['by_lead'][s][k]['crps']:.2f}" if k in v["by_lead"][s] else "-" for k in leads]
                 out.append(f"| {s} | " + " | ".join(cells) + " |")
         out.append("")
+    out += live.track_md(doc.get("track"), "forecast a day ahead, rebuilt from the archive")
     return "\n".join(out)
