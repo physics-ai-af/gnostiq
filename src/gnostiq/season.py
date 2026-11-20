@@ -89,7 +89,7 @@ def run(c, start=None, end=None):
     o, where = nimet.obs(c, start, end + pd.Timedelta(hours=23))
     rep = live.long(o, "nimet")
     j = live.score(pred.merge(rep, on=["valid", "var"]))
-    out_vars, j = live.summarize(j, ["valid", "lead_day"], CORE, REFS, np.random.default_rng(0))
+    out_vars, j = live.summarize(j, ["valid", "lead_day"], CORE, [*REFS, *live.others(j)], np.random.default_rng(0))
     for var, v in out_vars.items():
         g = j[j["var"] == var]
         v["by_lead"] = {s: {int(k): stats(x) for k, x in gs.groupby("lead_day")} for s, gs in g.groupby("system")}

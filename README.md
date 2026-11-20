@@ -1460,7 +1460,7 @@ pdm run gnostiq serve --host 0.0.0.0 --port 8080
 
 | Path | Returns |
 |---|---|
-| `/` | The page; `/?site=jos` opens another site |
+| `/` | The page; `/?site=jos` opens another site, `/?page=compare` the comparison page |
 | `/api/sites` | Every site beside the config: name, the site its networks were trained at, its config file, position, compared models |
 | `/api/<site>/forecast` | That site's `forecast.json` |
 | `/api/<site>/verify` | `scorecard.json` |
@@ -1475,15 +1475,18 @@ pdm run gnostiq serve --host 0.0.0.0 --port 8080
 
 The API only reads files. A report that has not been generated yet returns 404 with a message naming it, and the page shows which command to run.
 
-The page is one HTML file with no build step and no external scripts. With more than one site there is a switcher at the top. It has five parts:
+The page is one HTML file with no build step and no external scripts. With more than one site there is a switcher at the top, and beside it a switch between the forecast page and the comparison page. The forecast page has six parts:
 
 - **Forecast**: temperature and dewpoint with the 10th to 90th percentile band next to the raw models, and the daily chance of rain. The models in `nwp.compare` sit behind a "Show more models" button, so the default chart stays readable. For a site on borrowed networks a note says where they were trained and that the site is unverified, and the height-corrected base model is drawn too.
 - **Last 30 days**: the live check. First what the page forecast a day ahead against what was reported, hour by hour over the last week, with daily highs and lows; then error by day and the score tables.
+- **Track record**: day by day, the day-ahead high, low and average error against what was reported, for the live record or the rebuilt season.
 - **Season check**: a whole past season against NiMet reports, CRPS by lead day and the score table.
 - **Verification**: skill by lead time with its intervals, the score table, a reliability diagram for rain, and the rain scores against TAMSAT when it has been pulled. The selector switches variable; `#t2m`, `#td2m` and `#tp24` in the address deep-link to one.
 - **Heavy-rain cases**: one small chart per replayed day.
 
 A site on borrowed networks has no scorecard or case replays; those two parts link to the site the networks came from.
+
+The comparison page, `?page=compare`, answers one question per variable: is Gnostiq better, and than what? It opens with a verdict against the best alternative, the system with the lowest error among those Gnostiq has a skill range against: better if the whole range is above zero, worse if below, tied otherwise. Below that are Gnostiq's skill against every alternative with its 95% range, every system's error from best to worst, and the error month by month for Gnostiq, the best alternative, raw ECMWF and ECMWF's AI model. It switches between the rebuilt season and the live record. Both checks now give a skill range against each raw model too, so the other models, ECMWF's AI model among them, get a verdict of their own once the checks are run again.
 
 Every chart has a Table button with the same numbers, and the page follows the system light or dark setting. The footer carries the attribution Open-Meteo, NOAA, IEM and CHIRPS ask for; keep it if you restyle the page.
 

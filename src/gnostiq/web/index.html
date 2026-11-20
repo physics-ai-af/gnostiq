@@ -57,16 +57,28 @@ footer { margin-top: 48px; color: var(--text3); font-size: 12px; }
 .sites { display: flex; gap: 6px; margin: 0 0 14px; flex-wrap: wrap; }
 .sites a { font-size: 12px; color: var(--text2); text-decoration: none; border: 1px solid var(--rule); border-radius: 6px; padding: 3px 10px; }
 .sites a[aria-current] { color: var(--text); border-color: var(--text3); font-weight: 600; }
+.navs { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.badge { display: inline-block; font-weight: 650; font-size: 13px; border: 1px solid; border-radius: 6px; padding: 1px 10px; margin-right: 10px; }
+.badge.good { color: var(--emos); } .badge.tie { color: var(--text2); } .badge.bad { color: var(--raw); }
+.verdict { font-size: 15px; line-height: 1.5; }
 .note { background: var(--note); border: 1px solid var(--rule); border-radius: 8px; padding: 10px 14px; margin-top: 12px; color: var(--text2); }
 a { color: inherit; }
 </style>
 </head>
 <body>
 <main>
-  <nav class="sites" id="sites" aria-label="Site"></nav>
+  <div class="navs"><nav class="sites" id="pages" aria-label="Page"></nav><nav class="sites" id="sites" aria-label="Site"></nav></div>
   <div class="head"><h1 id="title">Gnostiq</h1><span class="sub" id="meta"></span></div>
   <p id="tagline">Global model forecasts corrected for one site, with uncertainty, checked against observations the model never saw.</p>
 
+  <div id="pg-compare" hidden>
+    <div class="note">Skill is how much lower Gnostiq's error is than another system's, on the same reports. Above zero, Gnostiq is better. The range shows how sure that is: a range that crosses zero means the two are tied on the evidence so far. The bar that matters is the best alternative, not the raw model Gnostiq starts from.</div>
+    <div class="filters" id="cpick"></div>
+    <p id="cmeta"></p>
+    <div id="compare"></div>
+  </div>
+
+  <div id="pg-main">
   <h2>Forecast</h2>
   <div id="forecast"></div>
   <p class="sub" id="record" hidden></p>
@@ -90,8 +102,9 @@ a { color: inherit; }
   <div id="verify"></div>
 
   <h2>Heavy-rain cases</h2>
-  <p id="cmeta"></p>
+  <p id="casemeta"></p>
   <div id="cases"></div>
+  </div>
 
   <footer>
     Forecast input: Open-Meteo (CC BY 4.0), ECMWF open data. Observations: NOAA GHCNh, Iowa Environmental Mesonet, Nigerian Meteorological Agency (WIS2). Rainfall: CHIRPS v3, Climate Hazards Center; TAMSAT v3.1, University of Reading. Public record: Autonomys Auto Drive.
@@ -244,13 +257,25 @@ function setSite(s) {
     : `Global model forecasts corrected for ${n}, with uncertainty, checked against observations the model never saw.`;
 }
 
+const PAGE = new URLSearchParams(location.search).get("page") === "compare" ? "compare" : "main";
+const link = (site, page) => "?" + new URLSearchParams({ ...(page === "compare" ? { page } : {}), site }).toString();
+
 function renderSites(sites) {
   const nav = $("#sites");
   nav.replaceChildren();
   if (sites.length < 2) return;
   for (const s of sites) {
-    const a = el("a", { href: `?site=${s.name}${location.hash}` }, nav, cap(s.name));
+    const a = el("a", { href: link(s.name, PAGE) + (PAGE === "main" ? location.hash : "") }, nav, cap(s.name));
     if (s.name === SITE.name) a.setAttribute("aria-current", "page");
+  }
+}
+
+function renderPages() {
+  const nav = $("#pages");
+  nav.replaceChildren();
+  for (const [page, name] of [["main", "Forecast"], ["compare", "Is it better?"]]) {
+    const a = el("a", { href: link(SITE.name, page) }, nav, name);
+    if (page === PAGE) a.setAttribute("aria-current", "page");
   }
 }
 
@@ -468,6 +493,112 @@ function trackBody(root, x) {
   table(e.tv, ["Day", "Gnostiq", raw], rows.map((r) => [r.day, fx(r.gnostiq_err, 2), fx(r.raw_err, 2)]));
 }
 
+function renderCompare(live, season) {
+  const root = $("#compare"), pick = $("#cpick"), site = cap(SITE.name);
+  root.replaceChildren();
+  pick.replaceChildren();
+  const has = (j) => j && j.vars && Object.values(j.vars).some((v) => v.cases);
+  const srcs = [];
+  if (has(season)) srcs.push({ key: "season", name: `Rebuilt season, ${season.window[0]} to ${season.window[1]}`, j: season,
+    about: `What every system would have forecast for ${site} from ${season.window[0]} to ${season.window[1]}, rebuilt from the forecast archive by networks that never saw this period, all scored on the same ${season.reports} NiMet reports, lead days 1 to 7.` });
+  if (has(live)) srcs.push({ key: "live", name: `As issued, last 30 days (${live.issues} ${live.issues === 1 ? "day" : "days"} of forecasts)`, j: live,
+    about: `The forecasts this page actually showed for ${site}, scored against reports that came in afterwards. So far these are compared with the raw models and the normal for the date only; EMOS is in the rebuilt season.` });
+  if (!srcs.length) {
+    $("#cmeta").textContent = "";
+    el("div", { class: "empty" }, root, `Nothing to compare for ${site} yet. Run: gnostiq season, or wait for the live check to score a few days.`);
+    return;
+  }
+  let cur = srcs[0];
+  const draw = () => {
+    root.replaceChildren();
+    for (const b of pick.children) b.setAttribute("aria-pressed", b.dataset.key === cur.key);
+    $("#cmeta").textContent = cur.about;
+    for (const [key, title] of [["t2m", "Temperature"], ["td2m", "Dewpoint"]]) compareVar(root, cur.j, key, title);
+  };
+  if (srcs.length > 1) for (const x of srcs) el("button", { type: "button", "data-key": x.key }, pick, x.name).onclick = () => { cur = x; draw(); };
+  draw();
+}
+
+function compareVar(root, j, key, title) {
+  const v = j.vars[key];
+  if (!v || !v.cases) return;
+  const site = cap(j.site), base = MODEL[j.base] || j.base;
+  const label = (s) => (s === "raw" ? `${base} (raw)` : s === "lapse" ? `${base} at ${site} height` : LABEL(s));
+  const pct = (x) => (x >= 0 ? "+" : "") + (x * 100).toFixed(1) + "%";
+  const crps = (s) => (v.systems[s] ? v.systems[s].crps : Infinity);
+  const sk = Object.entries(v.skill).filter(([, s]) => s);
+  el("h2", {}, root, `${title}, ${v.cases} cases`);
+
+  const top = el("div", { class: "card verdict" }, root);
+  if (!sk.length) el("div", {}, top, "Too few days yet for a verdict: a skill range needs about five days of reports.");
+  else {
+    // the strongest rival is the one with the lowest error among those Gnostiq has a range against
+    const best = sk.map(([r]) => r).sort((a, b) => crps(a) - crps(b))[0], s = v.skill[best];
+    const [word, cls] = s.lo > 0 ? ["Better", "good"] : s.hi < 0 ? ["Worse", "bad"] : ["Tied", "tie"];
+    const d = el("div", {}, top);
+    el("span", { class: `badge ${cls}` }, d, word);
+    d.append(`Against the best alternative, ${label(best)}, Gnostiq's error is ${Math.abs(s.skill * 100).toFixed(1)}% ${s.skill >= 0 ? "lower" : "higher"}, range ${pct(s.lo)} to ${pct(s.hi)} over ${s.days} days. `
+      + (cls === "tie" ? "The range crosses zero, so on this evidence the two are tied." : cls === "good" ? "The whole range is above zero." : "The whole range is below zero."));
+    const wins = sk.filter(([, x]) => x.lo > 0).length, losses = sk.filter(([, x]) => x.hi < 0).length;
+    el("div", { class: "sub", style: "margin-top:6px" }, top, `Clearly better than ${wins} of ${sk.length} alternatives` + (losses ? `, clearly worse than ${losses}` : "") + ", tied with the rest.");
+  }
+
+  if (sk.length) {
+    const c = card(root, "Gnostiq against each alternative", "How much lower Gnostiq's error is than each one's. Right of the line, Gnostiq is better; the bar is the 95% range.", [["Better", "var(--emos)"], ["Tied", "var(--text3)"], ["Worse", "var(--raw)"]]);
+    forest(c.body, sk.sort((a, b) => b[1].skill - a[1].skill).map(([r, s]) => ({ name: label(r), ...s })), pct);
+    table(c.tv, ["Against", "Skill", "Range", "Days"], sk.map(([r, s]) => [label(r), pct(s.skill), `${pct(s.lo)} to ${pct(s.hi)}`, s.days]));
+  }
+
+  const all = Object.entries(v.systems).sort((a, b) => a[1].crps - b[1].crps);
+  const c = card(root, "Every system's error, °C", "CRPS: the average error, crediting an honest range. Lower is better. A model that gives one number scores its plain average error.");
+  bars(c.body, all.map(([s, d]) => ({ name: label(s), v: d.crps, mine: s === "gnostiq", n: d.n })), v.cases);
+  table(c.tv, ["System", "Cases", "Bias °C", "Average error °C", "CRPS °C"], all.map(([s, d]) => [label(s), d.n, fx(d.bias, 2), fx(d.mae, 2), fx(d.crps, 2)]));
+
+  if (v.by_month && v.by_month.gnostiq) {
+    const rivals = Object.keys(v.skill).filter((r) => v.skill[r] && v.by_month[r]).sort((a, b) => crps(a) - crps(b));
+    const sys = [...new Set(["gnostiq", rivals[0], "raw", "raw:ecmwf_aifs025_single"])].filter((s) => s && v.by_month[s]);
+    const months = [...new Set(sys.flatMap((s) => Object.keys(v.by_month[s]).map(Number)))].sort((a, b) => a - b);
+    const mname = (m) => new Date(Date.UTC(2000, m - 1, 15)).toLocaleString("en-GB", { month: "short", timeZone: "UTC" });
+    const m = card(root, "Month by month, CRPS °C", "Gnostiq against the best alternative, the raw model and ECMWF's AI model. A system that is drifting shows here first.", sys.map((s) => [label(s), COLOR[s] || "var(--text3)"]));
+    lineChart(m.body, { label: "CRPS by month", x0: months[0] - 0.4, x1: months[months.length - 1] + 0.4, ymin: 0, h: 210,
+      xticks: months.map((x) => [x, mname(x)]), xfmt: mname, tfmt: (p) => fx(p[1], 2) + " °C",
+      series: sys.map((s) => ({ name: label(s), color: COLOR[s] || "var(--text3)", dots: 1, thin: s !== "gnostiq", pts: months.map((x) => [x, v.by_month[s][x] ? v.by_month[s][x].crps : null]) })) });
+    table(m.tv, ["Month", ...sys.map(label)], months.map((x) => [mname(x), ...sys.map((s) => (v.by_month[s][x] ? fx(v.by_month[s][x].crps, 2) : "-"))]));
+  }
+}
+
+function forest(parent, rows, pct) {
+  const W = 760, L = 250, R = 70, rh = 28, H = rows.length * rh + 30;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Gnostiq's skill against each alternative" }, parent);
+  const lo = Math.min(-0.05, ...rows.map((r) => r.lo)), hi = Math.max(0.05, ...rows.map((r) => r.hi)), pad = (hi - lo) * 0.06;
+  const X = lin(lo - pad, hi + pad, L, W - R);
+  for (const t of ticks(lo, hi)) {
+    el("line", { class: "grid", x1: X(t), x2: X(t), y1: 6, y2: H - 22 }, svg);
+    el("text", { x: X(t), y: H - 6, "text-anchor": "middle" }, svg, Math.round(t * 100) + "%");
+  }
+  el("line", { x1: X(0), x2: X(0), y1: 4, y2: H - 22, stroke: "var(--text3)", "stroke-width": 1.5 }, svg);
+  rows.forEach((r, i) => {
+    const y = 18 + i * rh, color = r.lo > 0 ? "var(--emos)" : r.hi < 0 ? "var(--raw)" : "var(--text3)";
+    el("text", { x: L - 10, y: y + 4, "text-anchor": "end", style: "fill:var(--text2)" }, svg, r.name);
+    el("line", { x1: X(r.lo), x2: X(r.hi), y1: y, y2: y, stroke: color, "stroke-width": 3, "stroke-linecap": "round" }, svg);
+    el("circle", { cx: X(r.skill), cy: y, r: 5, fill: color, stroke: "var(--card)", "stroke-width": 2 }, svg);
+    el("text", { x: W - R + 8, y: y + 4 }, svg, pct(r.skill));
+  });
+}
+
+function bars(parent, rows, cases) {
+  const W = 760, L = 250, R = 70, rh = 24, H = rows.length * rh + 8;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Every system's error" }, parent);
+  const X = lin(0, Math.max(...rows.map((r) => r.v)) * 1.05, L, W - R);
+  rows.forEach((r, i) => {
+    const y = 4 + i * rh;
+    el("text", { x: L - 10, y: y + 14, "text-anchor": "end", style: r.mine ? "fill:var(--text);font-weight:650" : "fill:var(--text2)" }, svg, r.name + (r.n < cases ? " *" : ""));
+    el("rect", { x: L, y: y + 3, width: Math.max(1, X(r.v) - L), height: rh - 8, rx: 3, fill: r.mine ? "var(--gnostiq)" : "var(--rule)" }, svg);
+    el("text", { x: X(r.v) + 6, y: y + 14 }, svg, fx(r.v, 2));
+  });
+  if (rows.some((r) => r.n < cases)) el("div", { class: "sub" }, parent, "* Fewer cases: that model was missing for some hours.");
+}
+
 function renderSeason(j) {
   const root = $("#season");
   root.replaceChildren();
@@ -561,7 +692,7 @@ function renderVerify() {
 function renderCases(k) {
   const root = $("#cases");
   root.replaceChildren();
-  $("#cmeta").textContent = `Wettest days in the test window. Each panel: chance of at least ${k.heavy_mm} mm as the day approached.`;
+  $("#casemeta").textContent = `Wettest days in the test window. Each panel: chance of at least ${k.heavy_mm} mm as the day approached.`;
   if (!k.cases.length) { el("div", { class: "empty" }, root, "No cases."); return; }
   const grid = el("div", { class: "cases" }, root);
   for (const cs of k.cases) {
@@ -609,13 +740,21 @@ async function start() {
   const want = new URLSearchParams(location.search).get("site");
   SITE = sites.find((s) => s.name === want) || sites[0];
   renderSites(sites);
+  renderPages();
   setSite(SITE);
   const api = (kind) => `api/${SITE.name}/${kind}`, cfg = SITE === sites[0] ? "" : ` --site ${SITE.name}`;
+  const json = (k) => fetch(api(k)).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  if (PAGE === "compare") {
+    $("#pg-main").hidden = true;
+    $("#pg-compare").hidden = false;
+    $("#tagline").textContent = `Is Gnostiq better than the alternatives at ${cap(SITE.name)}? Every system scored on the same reports.`;
+    Promise.all([json("live"), json("season")]).then(([l, s]) => renderCompare(l, s));
+    return;
+  }
   load(api("forecast"), "#forecast", renderForecast, `gnostiq${cfg} run`);
   fetch(api("records")).then((r) => (r.ok ? r.json() : null)).then((j) => j && renderRecords(j)).catch(() => {});
   load(api("live"), "#live", renderLive, `gnostiq${cfg} check`);
   load(api("season"), "#season", renderSeason, `gnostiq${cfg} season`);
-  const json = (k) => fetch(api(k)).then((r) => (r.ok ? r.json() : null)).catch(() => null);
   Promise.all([json("live"), json("season")]).then(([l, s]) => renderTrack(l, s));
   if (borrowed()) {
     const home = sites.find((s) => s.name === SITE.trained_at), link = home ? `?site=${home.name}` : null;

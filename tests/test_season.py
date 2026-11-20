@@ -31,7 +31,10 @@ def test_every_system_is_scored_on_the_same_reports(trained, reports):
     core = {"gnostiq", "raw", "lapse", "emos", "emos_multi", "clim"}
     assert core | {f"raw:{c.nwp.extra[0]}", f"raw:{c.nwp.compare[0]}"} <= set(t["systems"])
     assert {t["systems"][s]["n"] for s in core} == {t["cases"]}
-    assert set(t["skill"]) == core - {"gnostiq"} and all(s["lo"] <= s["skill"] <= s["hi"] for s in t["skill"].values())
+    raws = {s for s in t["systems"] if s.startswith("raw:")}
+    assert set(t["skill"]) == core - {"gnostiq"} | raws and all(
+        s["lo"] <= s["skill"] <= s["hi"] for s in t["skill"].values()
+    )
     assert set(t["by_lead"]["gnostiq"]) == set(c.lead_days) and set(t["by_month"]["gnostiq"]) == {4, 5, 6}
     assert set(out["hours"]) == set(range(8, 18)) and out["station"]["km"] == pytest.approx(11.1, abs=0.2)
     # the synthetic model is 2 C warm; the corrections must beat it

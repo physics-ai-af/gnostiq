@@ -96,6 +96,11 @@ def sources(rep):
     return {k: int(v) for k, v in rep.groupby("source").valid.nunique().items()}
 
 
+def others(j):
+    # every other model shown, so a comparison page can say whether Gnostiq beats each one
+    return sorted(s for s in set(j.system) if s.startswith("raw:"))
+
+
 def summarize(j, key, core, refs, rng):
     # a case counts only if every core system forecast it; a model missing some leads only shrinks its own n
     core = [s for s in core if s in set(j.system)]
@@ -245,7 +250,7 @@ def run(c, days=DAYS):
     rep = reports(c, since, until)
     j = score(a.merge(rep, on=["valid", "var"]))
     # the height correction alone; older archives lack it, so it is scored where present
-    out_vars, j = summarize(j, ["init", "valid"], ["gnostiq", "raw", "clim"], ["raw", "lapse", "clim"],
+    out_vars, j = summarize(j, ["init", "valid"], ["gnostiq", "raw", "clim"], ["raw", "lapse", "clim", *others(j)],
                             np.random.default_rng(0))  # fmt: skip
     for var, v in out_vars.items():
         g = j[j["var"] == var]
