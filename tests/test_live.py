@@ -51,7 +51,7 @@ def test_check_scores_what_was_shown_against_the_reports(issued, monkeypatch):
     assert t["systems"]["raw"]["mae"] == pytest.approx(1.0) and t["systems"]["raw"]["bias"] == pytest.approx(-1.0)
     assert t["systems"]["gnostiq"]["n"] == t["systems"]["raw"]["n"] == t["systems"]["clim"]["n"] == t["cases"]
     assert t["systems"][f"raw:{c.nwp.extra[0]}"]["n"] <= t["cases"]
-    assert set(t["skill"]) == {"raw", "lapse", "clim"}
+    assert set(t["skill"]) == {"raw", "lapse", "clim", *(f"raw:{m}" for m in c.nwp.extra)}
     assert all(s is None or s["lo"] <= s["skill"] <= s["hi"] for s in t["skill"].values())
     assert out["reports"] == rep.valid.nunique()
     assert t["daily"] and all({"day", "gnostiq", "raw"} <= set(d) for d in t["daily"])
