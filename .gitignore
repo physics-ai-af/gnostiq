@@ -1,0 +1,5 @@
+*/raw/
+*/processed/*
+!*/processed/static.json
+*/interim/*
+!*/interim/obs.parquet

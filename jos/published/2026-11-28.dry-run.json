@@ -1,0 +1,52 @@
+{
+ "schema": "gnostiq.record/1",
+ "site": {
+  "name": "jos",
+  "lat": 9.6398,
+  "lon": 8.8691,
+  "elev_m": 1289.9
+ },
+ "issued_utc": "2026-11-28T08:00Z",
+ "published_utc": "2026-11-28T08:04:57Z",
+ "forecast": {
+  "cid": null,
+  "sha256": "5568b11bbb653659a0f6cf580f213d7a87010b18c7d10a954bee3b6cec63dbc1",
+  "bytes": 87214,
+  "stored_bytes": 9497,
+  "format": "forecast.json, gzip"
+ },
+ "model": {
+  "trained_utc": "2026-11-18T20:50Z",
+  "trained_at": "abuja",
+  "hourly_sha256": "e4b54eec1c4ab044b40229f118024313326419d6fc6a60d136416d64f812e032",
+  "daily_sha256": "4fb4fb3e75eee763b1762d717e20d0e32e3265be0dc1f830386a3f75ef0d84c0"
+ },
+ "code": {
+  "version": "0.1.0",
+  "commit": "4aaa62ee5a41dd49c03bd0be68e58390bc304e99"
+ },
+ "config_sha256": "cbb36b586a468ee651b5af48d60430f97b27761eb7ec84ade7f002ee52efdef8",
+ "sources": {
+  "forecast": {
+   "provider": "Open-Meteo",
+   "base": "ecmwf_ifs025",
+   "others": [
+    "gfs_seamless",
+    "icon_seamless",
+    "ecmwf_aifs025_single",
+    "meteofrance_arpege_world",
+    "jma_gsm",
+    "gem_global"
+   ]
+  },
+  "training": {
+   "window": [
+    "2021-01-01",
+    "2025-03-31"
+   ],
+   "temperature": "ghcnh",
+   "rain": "chirps"
+  }
+ },
+ "previous": null
+}
